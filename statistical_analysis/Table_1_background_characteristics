@@ -19,7 +19,6 @@ library(agricolae)
 
         ##### =========================== 0. LOAD FILE =========================== #####
 #masterfile
-setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
 masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
 #10230 196
 
