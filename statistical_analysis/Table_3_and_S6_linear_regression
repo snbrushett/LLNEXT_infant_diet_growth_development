@@ -17,12 +17,10 @@ library(foreach)
 
         ##### =========================== 0. LOAD FILE =========================== #####
 #masterfile
-setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
 masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
 #10230 196
 
 #dietary clusters
-setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/latent_profile_analysis/RE_ Results LPA/")
 dietary_clusters <- read.delim("infant_LPA_dietary_clusters_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
 #1622 8
 
@@ -3099,6 +3097,5 @@ sum(final_linear_models$FDR<0.05)
 sum(final_linear_models$P_value<0.05)
 #67
 
-setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/linear_regressions/")
 write.table(final_linear_models, "2024_04_22_infant_diet_growth_development_updated.txt", sep="\t", row.names=F, quote = F) 
 rm(list=ls())
