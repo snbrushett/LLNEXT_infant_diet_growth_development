@@ -1,0 +1,2284 @@
+##     SCRIPT: DIETARY CLUSTERS: METADATA CORRELATIONS
+###     AUTHOR(S): JSIOBHAN BRUSHETT
+###     DESCRIPTION: DIETARY CLUSTERS: METADATA CORRELATIONS 
+###     LAST UPDATED: 30 APRIL 2024
+###     NOTE(S): 
+
+#libraries
+library(tidyverse)
+## Contents of this file
+
+## 0. LOAD FILES
+## 1. REFORMAT DATA
+## 2. DIETARY CLUSTERS - METADATA CHI-SQUARE TESTS
+
+        ##### =========================== 0. LOAD FILES =========================== #####
+#masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+#dietary clusters
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/latent_profile_analysis/RE_ Results LPA/")
+dietary_clusters <- read.delim("infant_LPA_dietary_clusters_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#1622 8
+
+#merge all
+masterfile <- full_join(masterfile, dietary_clusters)
+#10230 202
+rm(dietary_clusters)
+
+#masterfile selection for comparing clusters with metadata
+#setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/dietary_clusters_metadata_sankey/")
+#selection_test <- read.delim("dietary_cluster_metadata_correlation_selection.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+
+#table(selection_test$correlation_dietary_cluster) #38
+
+#subset masterfile according selection file
+#selection_test <- selection_test %>% 
+#        filter(correlation_dietary_cluster == 1)
+#selection_test$variable_name <- as.factor(as.character(selection_test$variable_name)) #remove factor levels with 0
+#matching_cols <- selection_test$variable_name
+#masterfile_sel <- masterfile_diet %>%
+#        select(any_of(matching_cols))
+#str(masterfile_sel, list.len=ncol(masterfile_sel))
+##10230 38
+
+#rm(selection_test)
+
+        ##### =========================== 1. REFORMAT DATA =========================== #####
+#mother pre-pregnancy BMI
+hist(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2[masterfile$timepoint=="M12"])
+table(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2[masterfile$timepoint=="M12"], useNA = "ifany")
+masterfile <- masterfile %>% 
+        mutate(mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg = ifelse (mother_lifelinesbirthcards_prepreg_bmi_kg_m2<18.5, "underweight",
+                                                                           ifelse(mother_lifelinesbirthcards_prepreg_bmi_kg_m2>=18.5 &
+                                                                                          mother_lifelinesbirthcards_prepreg_bmi_kg_m2<25, "normal",
+                                                                                  ifelse(mother_lifelinesbirthcards_prepreg_bmi_kg_m2>=25, "overweight_obese", NA))))
+masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg <- factor(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, levels=c("underweight",
+                                                                                                                                              "normal",
+                                                                                                                                              "overweight_obese"))
+
+table(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg[masterfile$timepoint=="M12"], useNA = "ifany")
+
+#parity
+hist(masterfile$mother_birthcard_parity[masterfile$timepoint=="M12"])
+masterfile <- masterfile %>% 
+        mutate(mother_birthcard_parity_catg = ifelse (mother_birthcard_parity==1, "primiparous", "multiparous")) %>%
+        mutate_if(is.character, as.factor)
+masterfile$mother_birthcard_parity_catg <- factor(masterfile$mother_birthcard_parity_catg, levels = c("primiparous", "multiparous"))
+table(masterfile$mother_birthcard_parity_catg[masterfile$timepoint=="M12"])
+
+#gestational age
+hist(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"])
+table(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"], useNA="ifany")
+
+masterfile <- masterfile %>% 
+        mutate(mother_birthcardself_gestational_age_weeks_catg = ifelse(mother_birthcardself_gestational_age_weeks <36.9, "pre_term",
+                                                                        ifelse(mother_birthcardself_gestational_age_weeks >= 36.9, "term", NA))) %>%
+        mutate_if(is.character, as.factor)
+
+table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#pre_term     term     <NA> 
+#530     7620     2080 
+
+#breastfeeding stopped
+table(masterfile$infant_ffq_breastfeeding_stopped_months, useNA = "ifany")
+masterfile$infant_ffq_breastfeeding_stopped_months <- as.character(masterfile$infant_ffq_breastfeeding_stopped_months)
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="1,5"] <- "2"
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="4,5"] <- "5"
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="10,5"] <- "11"
+masterfile$infant_ffq_breastfeeding_stopped_months <- as.numeric(masterfile$infant_ffq_breastfeeding_stopped_months)
+
+hist(masterfile$infant_ffq_breastfeeding_stopped_months)
+
+masterfile <- masterfile %>% 
+        mutate(infant_ffq_breastfeeding_stopped_months_catg = ifelse(infant_ffq_breastfeeding_stopped_months == 0, "never_BF",
+                                                                     ifelse(infant_ffq_breastfeeding_stopped_months>0 &
+                                                                                    infant_ffq_breastfeeding_stopped_months<6, "<6_months",
+                                                                            ifelse(infant_ffq_breastfeeding_stopped_months>=6, ">=6_months", NA))))
+
+
+masterfile$infant_ffq_breastfeeding_stopped_months_catg <- factor(masterfile$infant_ffq_breastfeeding_stopped_months_catg, levels=c("never_BF",
+                                                                                                                                    "<6_months",
+                                                                                                                                    ">=6_months"))
+
+table(masterfile$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+#timing food introduction
+table(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months, useNA = "ifany")
+hist(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months[masterfile$timepoint=="M12"])
+
+masterfile <- masterfile %>% 
+        mutate(infant_ffq_pureed_fruit_veg_intro_age_months_catg = ifelse(infant_ffq_pureed_fruit_veg_intro_age_months<4, "<4_months",
+                                                                          ifelse(infant_ffq_pureed_fruit_veg_intro_age_months>=4 & infant_ffq_pureed_fruit_veg_intro_age_months<=6, "4_6_months",
+                                                                                 ifelse(infant_ffq_pureed_fruit_veg_intro_age_months>6, ">6_months", NA))))
+masterfile$infant_ffq_pureed_fruit_veg_intro_age_months_catg <- factor(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months_catg, levels=c("<4_months",
+                                                                                                                                              "4_6_months",
+                                                                                                                                              ">6_months"))
+
+        ##### =========================== 2. DIETARY CLUSTERS - METADATA CHI-SQUARE TESTS =========================== #####
+        ##### 2.1 GRAMS PER DAY #####
+                ##### 2.1.1 M6 #####
+masterfile_M6 <- masterfile %>% 
+        filter(timepoint=="M6")
+#1023 207
+
+#retrospectively add infant_ffq_excl_breastfeeding_wks [2024-04-09]
+excl_BF <- masterfile %>% 
+        filter(timepoint=="M12") %>%
+        select(c(next_id_mother,
+                 next_id_infant,
+                 infant_ffq_excl_breastfeeding_wks)) 
+table(excl_BF$infant_ffq_excl_breastfeeding_wks, useNA="ifany")
+
+excl_BF <- excl_BF %>% 
+        mutate(excl_BF = ifelse(infant_ffq_excl_breastfeeding_wks == 0, "never_BF",
+                                ifelse(infant_ffq_excl_breastfeeding_wks>0 &
+                                               infant_ffq_excl_breastfeeding_wks<26, "<6_months",
+                                       ifelse(infant_ffq_excl_breastfeeding_wks>=26, ">=6_months", NA))))
+excl_BF$excl_BF <- factor(excl_BF$excl_BF, levels=c("never_BF",
+                                                    "<6_months",
+                                                    ">=6_months"))
+table(excl_BF$excl_BF, useNA="ifany")
+excl_BF$infant_ffq_excl_breastfeeding_wks <- NULL
+
+masterfile <- left_join(masterfile, excl_BF)
+masterfile_M6 <- left_join(masterfile_M6, excl_BF)
+
+cluster_1_M6_gday <- masterfile %>% 
+        filter(cluster_gday=="1") %>%
+        filter(timepoint=="M6")
+#253 208
+
+cluster_2_M6_gday <- masterfile %>% 
+        filter(cluster_gday=="2") %>%
+        filter(timepoint=="M6")
+#305 208
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(cluster_1_M6_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(cluster_1_M6_gday$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_birthcard_parity_catg,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(cluster_1_M6_gday$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$birth_deliverybirthcard_mode_binary,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(cluster_1_M6_gday$mother_education_p18, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$mother_education_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_education_p18,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+            
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(cluster_1_M6_gday$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_health_smoked_one_whole_year_p18,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(cluster_1_M6_gday$infant_sex_misc, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$infant_sex_misc))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_sex_misc,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(cluster_1_M6_gday$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #infant_growth_birth_weight_kg
+hist(masterfile_M6$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+mean(cluster_1_M6_gday$infant_growth_birth_weight_kg, na.rm=T)
+mean(cluster_2_M6_gday$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_1_M6_gday$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_2_M6_gday$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ cluster_gday, data = masterfile_M6)
+
+        #infant_ffq_feeding_mode_simple
+table1 <- table(cluster_1_M6_gday$infant_ffq_feeding_mode_simple, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$infant_ffq_feeding_mode_simple))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$infant_ffq_feeding_mode_simple))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_ffq_feeding_mode_simple,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #exlusive breastfeeding
+table1 <- table(cluster_1_M6_gday$excl_BF, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$excl_BF, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$excl_BF))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$excl_BF))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$excl_BF,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_breastfeeding_stopped_months_catg
+table1 <- table(cluster_1_M6_gday$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$infant_ffq_breastfeeding_stopped_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$infant_ffq_breastfeeding_stopped_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_ffq_breastfeeding_stopped_months_catg,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(cluster_1_M6_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M6$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_gday_item_sum_recal
+hist(masterfile_M6$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_gday$infant_ffq_gday_item_sum_recal)
+summary(cluster_2_M6_gday$infant_ffq_gday_item_sum_recal)
+
+median(cluster_1_M6_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M6_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(cluster_2_M6_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M6_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6$infant_ffq_gday_item_sum_recal ~ masterfile_M6$cluster_gday)
+test$p.value
+
+        #infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M6$infant_ffq_energy_kcalday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_gday$infant_ffq_energy_kcalday_item_sum_recal)
+summary(cluster_2_M6_gday$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(cluster_1_M6_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+median(cluster_2_M6_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M6_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M6_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M6$cluster_gday)
+test$p.value
+
+        #infant_ffq_carbs_energy_perc_recal
+hist(masterfile_M6$infant_ffq_carbs_energy_perc_recal) #left skewed
+dev.off()
+
+summary(cluster_1_M6_gday$infant_ffq_carbs_energy_perc_recal)
+summary(cluster_2_M6_gday$infant_ffq_carbs_energy_perc_recal)
+
+median(cluster_1_M6_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_carbs_energy_perc_recal ~ masterfile_M6$cluster_gday)
+
+        #infant_ffq_fat_energy_perc_recal
+hist(masterfile_M6$infant_ffq_fat_energy_perc_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_gday$infant_ffq_fat_energy_perc_recal)
+summary(cluster_2_M6_gday$infant_ffq_fat_energy_perc_recal)
+
+median(cluster_1_M6_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6$infant_ffq_fat_energy_perc_recal ~ masterfile_M6$cluster_gday)
+test$p.value
+
+        #infant_ffq_protein_energy_perc_recal
+hist(masterfile_M6$infant_ffq_protein_energy_perc_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_gday$infant_ffq_protein_energy_perc_recal)
+summary(cluster_2_M6_gday$infant_ffq_protein_energy_perc_recal)
+
+median(cluster_1_M6_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_protein_energy_perc_recal ~ masterfile_M6$cluster_gday)
+
+        #infant_ffq_fiber_energy_perc_recal
+hist(masterfile_M6$infant_ffq_fiber_energy_perc_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_gday$infant_ffq_fiber_energy_perc_recal)
+summary(cluster_2_M6_gday$infant_ffq_fiber_energy_perc_recal)
+
+median(cluster_1_M6_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_fiber_energy_perc_recal ~ masterfile_M6$cluster_gday)
+
+rm(masterfile_M6, cluster_1_M6_gday, cluster_2_M6_gday, test)
+
+                ##### 2.1.2 M9 #####
+masterfile_M9 <- masterfile %>% 
+        filter(timepoint=="M9")
+#1023 208
+
+cluster_1_M9_gday <- masterfile %>% 
+        filter(cluster_gday=="1") %>%
+        filter(timepoint=="M9")
+#342 208
+
+cluster_2_M9_gday <- masterfile %>% 
+        filter(cluster_gday=="2") %>%
+        filter(timepoint=="M9")
+#244 208
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(cluster_1_M9_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(cluster_1_M9_gday$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_birthcard_parity_catg,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(cluster_1_M9_gday$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$birth_deliverybirthcard_mode_binary,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(cluster_1_M9_gday$mother_education_p18, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$mother_education_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_education_p18,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(cluster_1_M9_gday$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_health_smoked_one_whole_year_p18,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(cluster_1_M9_gday$infant_sex_misc, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$infant_sex_misc))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_sex_misc,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(cluster_1_M9_gday$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #infant_growth_birth_weight_kg
+hist(masterfile_M9$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+summary(cluster_1_M9_gday$infant_growth_birth_weight_kg)
+summary(cluster_2_M9_gday$infant_growth_birth_weight_kg)
+
+sd(cluster_1_M9_gday$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_2_M9_gday$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ cluster_gday, data = masterfile_M9)
+
+        #infant_ffq_feeding_mode_simple
+table1 <- table(cluster_1_M9_gday$infant_ffq_feeding_mode_simple, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$infant_ffq_feeding_mode_simple))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$infant_ffq_feeding_mode_simple))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_ffq_feeding_mode_simple,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #exclusive breastfeeding
+table1 <- table(cluster_1_M9_gday$excl_BF, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$excl_BF, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$excl_BF))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$excl_BF))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$excl_BF,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_breastfeeding_stopped_months_catg
+table1 <- table(cluster_1_M9_gday$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$infant_ffq_breastfeeding_stopped_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$infant_ffq_breastfeeding_stopped_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_ffq_breastfeeding_stopped_months_catg,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(cluster_1_M9_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M9$cluster_gday) 
+chisq.test(test)
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M9$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M9_gday$infant_ffq_gday_item_sum_recal)
+summary(cluster_2_M9_gday$infant_ffq_gday_item_sum_recal)
+
+median(cluster_1_M9_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M9_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(cluster_2_M9_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M9_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M9$infant_ffq_gday_item_sum_recal ~ masterfile_M9$cluster_gday)
+test$p.value
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M9$infant_ffq_energy_kcalday_item_sum_recal) #slightly right skewed
+dev.off()
+
+summary(cluster_1_M9_gday$infant_ffq_energy_kcalday_item_sum_recal)
+summary(cluster_2_M9_gday$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(cluster_1_M9_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+median(cluster_2_M9_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M9_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M9_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M9$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M9$cluster_gday)
+test$p.value
+
+        #infant_ffq_carbs_energy_perc_recal
+hist(masterfile_M9$infant_ffq_carbs_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M9_gday$infant_ffq_carbs_energy_perc_recal)
+summary(cluster_2_M9_gday$infant_ffq_carbs_energy_perc_recal)
+
+mean(cluster_1_M9_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_carbs_energy_perc_recal ~ masterfile_M9$cluster_gday)
+
+#infant_ffq_fat_energy_perc_recal
+hist(masterfile_M9$infant_ffq_fat_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M9_gday$infant_ffq_fat_energy_perc_recal)
+summary(cluster_2_M9_gday$infant_ffq_fat_energy_perc_recal)
+
+mean(cluster_1_M9_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_fat_energy_perc_recal ~ masterfile_M9$cluster_gday)
+
+#infant_ffq_protein_energy_perc_recal
+hist(masterfile_M9$infant_ffq_protein_energy_perc_recal)
+dev.off()
+
+summary(cluster_1_M9_gday$infant_ffq_protein_energy_perc_recal)
+summary(cluster_2_M9_gday$infant_ffq_protein_energy_perc_recal)
+
+mean(cluster_1_M9_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_protein_energy_perc_recal ~ masterfile_M9$cluster_gday)
+
+#infant_ffq_fiber_energy_perc_recal
+hist(masterfile_M9$infant_ffq_fiber_energy_perc_recal) 
+dev.off()
+
+summary(cluster_1_M9_gday$infant_ffq_fiber_energy_perc_recal)
+summary(cluster_2_M9_gday$infant_ffq_fiber_energy_perc_recal)
+
+mean(cluster_1_M9_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_fiber_energy_perc_recal ~ masterfile_M9$cluster_gday)
+
+rm(masterfile_M9, cluster_1_M9_gday, cluster_2_M9_gday, test)
+
+                ##### 2.1.3 M12 #####
+masterfile_M12 <- masterfile %>% 
+        filter(timepoint=="M12")
+#1023 209
+
+cluster_1_M12_gday <- masterfile %>% 
+        filter(cluster_gday=="1") %>%
+        filter(timepoint=="M12")
+#255 208
+
+cluster_2_M12_gday <- masterfile %>% 
+        filter(cluster_gday=="2") %>%
+        filter(timepoint=="M12")
+#223 208
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(cluster_1_M12_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(cluster_1_M12_gday$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_birthcard_parity_catg,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(cluster_1_M12_gday$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$birth_deliverybirthcard_mode_binary,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(cluster_1_M12_gday$mother_education_p18, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$mother_education_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_education_p18,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(cluster_1_M12_gday$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_health_smoked_one_whole_year_p18,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(cluster_1_M12_gday$infant_sex_misc, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$infant_sex_misc))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_sex_misc,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(cluster_1_M12_gday$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #infant_growth_birth_weight_kg
+hist(masterfile_M12$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+summary(cluster_1_M12_gday$infant_growth_birth_weight_kg)
+summary(cluster_2_M12_gday$infant_growth_birth_weight_kg)
+
+sd(cluster_1_M12_gday$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_2_M12_gday$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ cluster_gday, data = masterfile_M12)
+
+        #infant_ffq_feeding_mode_simple
+table1 <- table(cluster_1_M12_gday$infant_ffq_feeding_mode_simple, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$infant_ffq_feeding_mode_simple))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$infant_ffq_feeding_mode_simple))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_ffq_feeding_mode_simple,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #exclusive breastfeeding
+table1 <- table(cluster_1_M12_gday$excl_BF, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$excl_BF, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$excl_BF))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$excl_BF))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$excl_BF,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_breastfeeding_stopped_months_catg
+table1 <- table(cluster_1_M12_gday$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$infant_ffq_breastfeeding_stopped_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$infant_ffq_breastfeeding_stopped_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_ffq_breastfeeding_stopped_months_catg,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+
+        #infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(cluster_1_M12_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_gday$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M12$cluster_gday) 
+chisq.test(test)
+fisher.test(test)
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M12$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M12_gday$infant_ffq_gday_item_sum_recal)
+summary(cluster_2_M12_gday$infant_ffq_gday_item_sum_recal)
+
+median(cluster_1_M12_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M12_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(cluster_2_M12_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M12_gday$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M12$infant_ffq_gday_item_sum_recal ~ masterfile_M12$cluster_gday)
+test$p.value
+        #infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M12$infant_ffq_energy_kcalday_item_sum_recal) #slightly right skewed
+dev.off()
+
+summary(cluster_1_M12_gday$infant_ffq_energy_kcalday_item_sum_recal)
+summary(cluster_2_M12_gday$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(cluster_1_M12_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+median(cluster_2_M12_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M12_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M12_gday$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M12$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M12$cluster_gday)
+test$p.value
+
+        #infant_ffq_carbs_energy_perc_recal
+hist(masterfile_M12$infant_ffq_carbs_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M12_gday$infant_ffq_carbs_energy_perc_recal)
+summary(cluster_2_M12_gday$infant_ffq_carbs_energy_perc_recal)
+
+mean(cluster_1_M12_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_gday$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_carbs_energy_perc_recal ~ masterfile_M12$cluster_gday)
+
+#infant_ffq_fat_energy_perc_recal
+hist(masterfile_M12$infant_ffq_fat_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M12_gday$infant_ffq_fat_energy_perc_recal)
+summary(cluster_2_M12_gday$infant_ffq_fat_energy_perc_recal)
+
+mean(cluster_1_M12_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_gday$infant_ffq_fat_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_fat_energy_perc_recal ~ masterfile_M12$cluster_gday)
+
+#infant_ffq_protein_energy_perc_recal
+hist(masterfile_M12$infant_ffq_protein_energy_perc_recal)
+dev.off()
+
+summary(cluster_1_M12_gday$infant_ffq_protein_energy_perc_recal)
+summary(cluster_2_M12_gday$infant_ffq_protein_energy_perc_recal)
+
+mean(cluster_1_M12_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_gday$infant_ffq_protein_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_protein_energy_perc_recal ~ masterfile_M12$cluster_gday)
+
+#infant_ffq_fiber_energy_perc_recal
+hist(masterfile_M12$infant_ffq_fiber_energy_perc_recal) 
+dev.off()
+
+summary(cluster_1_M12_gday$infant_ffq_fiber_energy_perc_recal)
+summary(cluster_2_M12_gday$infant_ffq_fiber_energy_perc_recal)
+
+mean(cluster_1_M12_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_gday$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_fiber_energy_perc_recal ~ masterfile_M12$cluster_gday)
+
+rm(masterfile_M12, cluster_1_M12_gday, cluster_2_M12_gday, test)
+
+        ##### 2.2 KCAL PER DAY #####
+                ##### 2.2.1 M6 #####
+masterfile_M6 <- masterfile %>% 
+        filter(timepoint=="M6")
+#1023 208
+
+cluster_1_M6_kcal <- masterfile %>% 
+        filter(cluster_kday=="1") %>%
+        filter(timepoint=="M6")
+#195 208
+
+cluster_2_M6_kcal <- masterfile %>% 
+        filter(cluster_kday=="2") %>%
+        filter(timepoint=="M6")
+#359 208
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(cluster_1_M6_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(cluster_1_M6_kcal$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_birthcard_parity_catg,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(cluster_1_M6_kcal$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$birth_deliverybirthcard_mode_binary,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(cluster_1_M6_kcal$mother_education_p18, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$mother_education_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_education_p18,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(cluster_1_M6_kcal$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_health_smoked_one_whole_year_p18,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(cluster_1_M6_kcal$infant_sex_misc, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$infant_sex_misc))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_sex_misc,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(cluster_1_M6_kcal$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #infant_growth_birth_weight_kg
+hist(masterfile_M6$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_growth_birth_weight_kg)
+summary(cluster_2_M6_kcal$infant_growth_birth_weight_kg)
+
+mean(cluster_1_M6_kcal$infant_growth_birth_weight_kg, na.rm=T)
+mean(cluster_2_M6_kcal$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_1_M6_kcal$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_2_M6_kcal$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ cluster_kday, data = masterfile_M6)
+
+        #infant_ffq_feeding_mode_simple
+table1 <- table(cluster_1_M6_kcal$infant_ffq_feeding_mode_simple, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$infant_ffq_feeding_mode_simple))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$infant_ffq_feeding_mode_simple))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_ffq_feeding_mode_simple,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #exclusive breastfeeding
+table1 <- table(cluster_1_M6_kcal$excl_BF, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$excl_BF, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$excl_BF))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$excl_BF))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$excl_BF,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #infant_ffq_breastfeeding_stopped_months_catg
+table1 <- table(cluster_1_M6_kcal$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$infant_ffq_breastfeeding_stopped_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$infant_ffq_breastfeeding_stopped_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_ffq_breastfeeding_stopped_months_catg,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+
+        #infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(cluster_1_M6_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M6_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M6_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M6_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M6$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M6$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_ffq_gday_item_sum_recal)
+summary(cluster_2_M6_kcal$infant_ffq_gday_item_sum_recal)
+
+median(cluster_1_M6_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M6_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(cluster_2_M6_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M6_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M6$cluster_kday)
+test$p.value
+
+        #infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M6$infant_ffq_energy_kcalday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_ffq_energy_kcalday_item_sum_recal)
+summary(cluster_2_M6_kcal$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(cluster_1_M6_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+median(cluster_2_M6_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M6_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M6_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M6$cluster_kday)
+test$p.value
+
+        #infant_ffq_carbs_energy_perc_recal
+hist(masterfile_M6$infant_ffq_carbs_energy_perc_recal) #left skewed
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_ffq_carbs_energy_perc_recal)
+summary(cluster_2_M6_kcal$infant_ffq_carbs_energy_perc_recal)
+
+median(cluster_1_M6_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_carbs_energy_perc_recal ~ masterfile_M6$cluster_kday)
+
+        #infant_ffq_fat_energy_perc_recal
+hist(masterfile_M6$infant_ffq_fat_energy_perc_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_ffq_fat_energy_perc_recal)
+summary(cluster_2_M6_kcal$infant_ffq_fat_energy_perc_recal)
+
+median(cluster_1_M6_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_fat_energy_perc_recal ~ masterfile_M6$cluster_kday)
+
+        #infant_ffq_protein_energy_perc_recal
+hist(masterfile_M6$infant_ffq_protein_energy_perc_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_ffq_protein_energy_perc_recal)
+summary(cluster_2_M6_kcal$infant_ffq_protein_energy_perc_recal)
+
+median(cluster_1_M6_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_protein_energy_perc_recal ~ masterfile_M6$cluster_kday)
+
+        #infant_ffq_fiber_energy_perc_recal
+hist(masterfile_M6$infant_ffq_fiber_energy_perc_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M6_kcal$infant_ffq_fiber_energy_perc_recal)
+summary(cluster_2_M6_kcal$infant_ffq_fiber_energy_perc_recal)
+
+median(cluster_1_M6_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+median(cluster_2_M6_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+IQR(cluster_1_M6_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+IQR(cluster_2_M6_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+wilcox.test(masterfile_M6$infant_ffq_fiber_energy_perc_recal ~ masterfile_M6$cluster_kday)
+
+rm(masterfile_M6, cluster_1_M6_kcal, cluster_2_M6_kcal, test)
+
+                ##### 2.2.2 M9 #####
+masterfile_M9 <- masterfile %>% 
+        filter(timepoint=="M9")
+#1023 208
+
+cluster_1_M9_kcal <- masterfile %>% 
+        filter(cluster_kday=="1") %>%
+        filter(timepoint=="M9")
+#352 208
+
+cluster_2_M9_kcal <- masterfile %>% 
+        filter(cluster_kday=="2") %>%
+        filter(timepoint=="M9")
+#234 208
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(cluster_1_M9_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(cluster_1_M9_kcal$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_birthcard_parity_catg,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(cluster_1_M9_kcal$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$birth_deliverybirthcard_mode_binary,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(cluster_1_M9_kcal$mother_education_p18, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$mother_education_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_education_p18,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(cluster_1_M9_kcal$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_health_smoked_one_whole_year_p18,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(cluster_1_M9_kcal$infant_sex_misc, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$infant_sex_misc))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_sex_misc,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(cluster_1_M9_kcal$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #infant_growth_birth_weight_kg
+hist(masterfile_M9$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_growth_birth_weight_kg)
+summary(cluster_2_M9_kcal$infant_growth_birth_weight_kg)
+
+sd(cluster_1_M9_kcal$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_2_M9_kcal$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ cluster_kday, data = masterfile_M9)
+
+        #infant_ffq_feeding_mode_simple
+table1 <- table(cluster_1_M9_kcal$infant_ffq_feeding_mode_simple, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$infant_ffq_feeding_mode_simple))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$infant_ffq_feeding_mode_simple))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_ffq_feeding_mode_simple,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #exclusive breastfeeding
+table1 <- table(cluster_1_M9_kcal$excl_BF, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$excl_BF, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$excl_BF))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$excl_BF))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$excl_BF,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #infant_ffq_breastfeeding_stopped_months_catg
+table1 <- table(cluster_1_M9_kcal$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$infant_ffq_breastfeeding_stopped_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$infant_ffq_breastfeeding_stopped_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_ffq_breastfeeding_stopped_months_catg,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+
+        #infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(cluster_1_M9_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M9_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M9_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M9_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M9$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #infant_ffq_gday_item_sum_recal
+hist(masterfile_M9$infant_ffq_gday_item_sum_recal) #slightly right skewed
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_ffq_gday_item_sum_recal)
+summary(cluster_2_M9_kcal$infant_ffq_gday_item_sum_recal)
+
+median(cluster_1_M9_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M9_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(cluster_2_M9_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M9_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M9$infant_ffq_gday_item_sum_recal ~ masterfile_M9$cluster_kday)
+test$p.value
+
+        #infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M9$infant_ffq_energy_kcalday_item_sum_recal) #slightly right skewed
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_ffq_energy_kcalday_item_sum_recal)
+summary(cluster_2_M9_kcal$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(cluster_1_M9_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+median(cluster_2_M9_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M9_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M9_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M9$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M9$cluster_kday)
+test$p.value
+
+        #infant_ffq_carbs_energy_perc_recal
+hist(masterfile_M9$infant_ffq_carbs_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_ffq_carbs_energy_perc_recal)
+summary(cluster_2_M9_kcal$infant_ffq_carbs_energy_perc_recal)
+
+mean(cluster_1_M9_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_carbs_energy_perc_recal ~ masterfile_M9$cluster_kday)
+
+        #infant_ffq_fat_energy_perc_recal
+hist(masterfile_M9$infant_ffq_fat_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_ffq_fat_energy_perc_recal)
+summary(cluster_2_M9_kcal$infant_ffq_fat_energy_perc_recal)
+
+mean(cluster_1_M9_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_fat_energy_perc_recal ~ masterfile_M9$cluster_kday)
+
+        #infant_ffq_protein_energy_perc_recal
+hist(masterfile_M9$infant_ffq_protein_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_ffq_protein_energy_perc_recal)
+summary(cluster_2_M9_kcal$infant_ffq_protein_energy_perc_recal)
+
+mean(cluster_1_M9_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_protein_energy_perc_recal ~ masterfile_M9$cluster_kday)
+
+        #infant_ffq_fiber_energy_perc_recal
+hist(masterfile_M9$infant_ffq_fiber_energy_perc_recal)
+dev.off()
+
+summary(cluster_1_M9_kcal$infant_ffq_fiber_energy_perc_recal)
+summary(cluster_2_M9_kcal$infant_ffq_fiber_energy_perc_recal)
+
+mean(cluster_1_M9_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+mean(cluster_2_M9_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_1_M9_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_2_M9_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M9$infant_ffq_fiber_energy_perc_recal ~ masterfile_M9$cluster_kday)
+
+rm(masterfile_M9, cluster_1_M9_kcal, cluster_2_M9_kcal, test)
+
+                ##### 2.2.3 M12 #####
+masterfile_M12 <- masterfile %>% 
+        filter(timepoint=="M12")
+#1023 208
+
+cluster_1_M12_kcal <- masterfile %>% 
+        filter(cluster_kday=="1") %>%
+        filter(timepoint=="M12")
+#261 208
+
+cluster_2_M12_kcal <- masterfile %>% 
+        filter(cluster_kday=="2") %>%
+        filter(timepoint=="M12")
+#217 208
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(cluster_1_M12_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(cluster_1_M12_kcal$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_birthcard_parity_catg,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(cluster_1_M12_kcal$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$birth_deliverybirthcard_mode_binary,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(cluster_1_M12_kcal$mother_education_p18, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$mother_education_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_education_p18,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(cluster_1_M12_kcal$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_health_smoked_one_whole_year_p18,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(cluster_1_M12_kcal$infant_sex_misc, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$infant_sex_misc))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_sex_misc,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(cluster_1_M12_kcal$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #infant_growth_birth_weight_kg
+hist(masterfile_M12$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_growth_birth_weight_kg)
+summary(cluster_2_M12_kcal$infant_growth_birth_weight_kg)
+
+sd(cluster_1_M12_kcal$infant_growth_birth_weight_kg, na.rm=T)
+sd(cluster_2_M12_kcal$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ cluster_kday, data = masterfile_M12)
+
+        #infant_ffq_feeding_mode_simple
+table1 <- table(cluster_1_M12_kcal$infant_ffq_feeding_mode_simple, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$infant_ffq_feeding_mode_simple))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$infant_ffq_feeding_mode_simple))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_ffq_feeding_mode_simple,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #exclusive breastfeeding
+table1 <- table(cluster_1_M12_kcal$excl_BF, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$excl_BF, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$excl_BF))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$excl_BF))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$excl_BF,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #infant_ffq_breastfeeding_stopped_months_catg
+table1 <- table(cluster_1_M12_kcal$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$infant_ffq_breastfeeding_stopped_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$infant_ffq_breastfeeding_stopped_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_ffq_breastfeeding_stopped_months_catg,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+
+        #infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(cluster_1_M12_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(cluster_2_M12_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(cluster_1_M12_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(cluster_2_M12_kcal$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Cluster 1:")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Cluster 2:")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M12$cluster_kday) 
+chisq.test(test)
+fisher.test(test)
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M12$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_ffq_gday_item_sum_recal)
+summary(cluster_2_M12_kcal$infant_ffq_gday_item_sum_recal)
+
+median(cluster_1_M12_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M12_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(cluster_2_M12_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M12_kcal$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M12$infant_ffq_gday_item_sum_recal ~ masterfile_M12$cluster_kday)
+test$p.value
+
+        #infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M12$infant_ffq_energy_kcalday_item_sum_recal) #slightly right skewed
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_ffq_energy_kcalday_item_sum_recal)
+summary(cluster_2_M12_kcal$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(cluster_1_M12_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+median(cluster_2_M12_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_1_M12_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(cluster_2_M12_kcal$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M12$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M12$cluster_kday)
+test$p.value
+
+        #infant_ffq_carbs_energy_perc_recal
+hist(masterfile_M12$infant_ffq_carbs_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_ffq_carbs_energy_perc_recal)
+summary(cluster_2_M12_kcal$infant_ffq_carbs_energy_perc_recal)
+
+mean(cluster_1_M12_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_kcal$infant_ffq_carbs_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_carbs_energy_perc_recal ~ masterfile_M12$cluster_kday)
+
+        #infant_ffq_fat_energy_perc_recal
+hist(masterfile_M12$infant_ffq_fat_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_ffq_fat_energy_perc_recal)
+summary(cluster_2_M12_kcal$infant_ffq_fat_energy_perc_recal)
+
+mean(cluster_1_M12_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_kcal$infant_ffq_fat_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_fat_energy_perc_recal ~ masterfile_M12$cluster_kday)
+
+        #infant_ffq_protein_energy_perc_recal
+hist(masterfile_M12$infant_ffq_protein_energy_perc_recal) #normal
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_ffq_protein_energy_perc_recal)
+summary(cluster_2_M12_kcal$infant_ffq_protein_energy_perc_recal)
+
+mean(cluster_1_M12_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_kcal$infant_ffq_protein_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_protein_energy_perc_recal ~ masterfile_M12$cluster_kday)
+
+        #infant_ffq_fiber_energy_perc_recal
+hist(masterfile_M12$infant_ffq_fiber_energy_perc_recal)
+dev.off()
+
+summary(cluster_1_M12_kcal$infant_ffq_fiber_energy_perc_recal)
+summary(cluster_2_M12_kcal$infant_ffq_fiber_energy_perc_recal)
+
+mean(cluster_1_M12_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+mean(cluster_2_M12_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_1_M12_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+sd(cluster_2_M12_kcal$infant_ffq_fiber_energy_perc_recal, na.rm=T)
+
+# Perform t-test
+t.test(masterfile_M12$infant_ffq_fiber_energy_perc_recal ~ masterfile_M12$cluster_kday)
+
+rm(masterfile_M12, cluster_1_M12_kcal, cluster_2_M12_kcal, test)
