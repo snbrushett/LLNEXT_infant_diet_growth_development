@@ -1,0 +1,3104 @@
+###     SCRIPT: LINEAR REGRESSIONS OF DIETARY CLUSTERS WITH OUTCOMES
+###     AUTHOR(S): SIOBHAN BRUSHETT
+###     DESCRIPTION: LINEAR REGRESSIONS OF DIETARY CLUSTERS WITH GROWTH AND DEVELOPMENT AT 6, 9 AND 12 MONTHS
+###     PROJECT: LL-NEXT: PHR
+###     LAST UPDATED: 23 APRIL 2024
+###     NOTE(S): 
+
+#libraries
+library(tidyverse)
+library(foreach)
+
+## 0. LOAD DATA
+## 1. REFORMAT DATA
+## 2. FIT LINEAR MODELS: CONSUMPTION
+## 3. FIT LINEAR MODELS: CALORIC INTAKE
+## 4. WRITE COMBINED TABLE
+
+        ##### =========================== 0. LOAD FILE =========================== #####
+#masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+#dietary clusters
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/latent_profile_analysis/RE_ Results LPA/")
+dietary_clusters <- read.delim("infant_LPA_dietary_clusters_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#1622 8
+
+#merge all
+masterfile <- full_join(masterfile, dietary_clusters)
+#10230 202
+rm(dietary_clusters)
+
+        ##### =========================== 1. REFORMAT DATA =========================== #####
+#mother pre-pregnancy BMI
+masterfile <- masterfile %>% 
+        mutate(mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg = ifelse (mother_lifelinesbirthcards_prepreg_bmi_kg_m2<18.5, "underweight",
+                                                                           ifelse(mother_lifelinesbirthcards_prepreg_bmi_kg_m2>=18.5 &
+                                                                                          mother_lifelinesbirthcards_prepreg_bmi_kg_m2<25, "normal",
+                                                                                  ifelse(mother_lifelinesbirthcards_prepreg_bmi_kg_m2>=25, "overweight_obese", NA))))
+masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg <- factor(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, levels=c("underweight",
+                                                                                                                                              "normal",
+                                                                                                                                              "overweight_obese"))
+
+table(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg[masterfile$timepoint=="M12"], useNA = "ifany")
+
+#gestational age
+hist(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"])
+dev.off()
+table(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"], useNA="ifany")
+
+masterfile <- masterfile %>% 
+        mutate(mother_birthcardself_gestational_age_weeks_catg = ifelse(mother_birthcardself_gestational_age_weeks <36.9, "pre_term",
+                                                                        ifelse(mother_birthcardself_gestational_age_weeks >= 36.9, "term", NA))) %>%
+        mutate_if(is.character, as.factor)
+
+table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#pre_term     term     <NA> 
+#530     7620     2080 
+
+table(masterfile$infant_ffq_feeding_mode_simple, useNA="ifany")
+masterfile$infant_ffq_feeding_mode_simple <- factor(masterfile$infant_ffq_feeding_mode_simple, 
+                                                    levels=c("NBF",
+                                                             "BF"))
+table(masterfile$infant_ffq_feeding_mode_simple, useNA="ifany")
+
+masterfile$cluster_gday <- as.factor(masterfile$cluster_gday)
+str(masterfile$cluster_gday)
+masterfile$cluster_kday <- as.factor(masterfile$cluster_kday)
+str(masterfile$cluster_kday)
+
+        ##### =========================== 2. FIT LINEAR MODELS: CONSUMPTION =========================== #####
+                ####2.1 M6 diet w M6 outcomes: ####
+#M6 dataframe
+M6 <- masterfile %>% filter (
+        timepoint == "M6") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, #not enough power and skewing data
+                 infant_ffq_feeding_mode_simple,
+                 cluster_gday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_gm_score,
+                 infant_asq_fm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M6"), -next_id_infant) %>% 
+        na.omit()
+str(M6)
+#377 16
+
+#prepare different outcomes measurements
+outcomes_M6 <- M6 %>% select(c(next_id_infant,
+                                       infant_growth_WLZ_imputed_M6,
+                                       infant_growth_BMIz_imputed_M6,
+                                       infant_asq_total_score_M6,
+                                       infant_asq_com_score_M6,
+                                       infant_asq_gm_score_M6,
+                                       infant_asq_fm_score_M6,
+                                       infant_asq_ps_score_M6,
+                                       infant_asq_psoc_score_M6))
+rownames(outcomes_M6) <- outcomes_M6$next_id_infant
+head(outcomes_M6)
+outcomes_M6$next_id_infant <- NULL
+#377 8
+
+        #crude model
+#feeding_mode
+model_1_gday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_fm_M6)
+#8 10
+model_1_gday_fm_M6
+
+#clusters
+model_1_gday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_cl_M6)
+#8 10
+model_1_gday_cl_M6
+
+        #model 2: model 1 corrected for demographics (gestational age, sex and birthweight)
+        #feeding_mode
+model_2_gday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_fm_M6)
+#8 10
+model_2_gday_fm_M6
+
+#clusters
+model_2_gday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_cl_M6)
+#8 10
+model_2_gday_cl_M6
+
+        #model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_gday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_gday_M6 +
+                         M6$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clustergday_kcal",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_fm_M6)
+#8 10
+model_3_gday_fm_M6
+
+#clusters
+model_3_gday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_feeding_mode_simple_M6 +
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_cl_M6)
+#8 10
+model_3_gday_cl_M6
+
+        #model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_gday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6[,j] ~ 
+#                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6$infant_sex_misc_M6 +
+#                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6$cluster_gday_M6 +
+#                         M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M6$infant_ffq_feeding_mode_simple_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clustergday_kcal_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M6",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M6)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_fm_M6)
+#8 10
+#model_4_gday_fm_M6
+
+#clusters
+#model_4_gday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6[,j] ~ 
+#                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6$infant_sex_misc_M6 +
+#                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6$infant_ffq_feeding_mode_simple_M6 +
+#                         M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6$cluster_gday_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M6",
+#                dietary_feature = "dietary_pattern_gday",
+#                outcomes = colnames(outcomes_M6)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_cl_M6)
+#8 10
+#model_4_gday_cl_M6
+
+                ####2.2 M9 diet w M9 outcomes : ####
+#M9 dataframe
+M9 <- masterfile %>% filter (
+        timepoint == "M9") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+                 infant_ffq_feeding_mode_simple,
+                 cluster_gday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed)) %>%
+                 #infant_asq_total_score, #ASQ not available at M9
+                 #infant_asq_com_score,
+                 #infant_asq_gm_score,
+                 #infant_asq_fm_score,
+                 #infant_asq_ps_score,
+                 #infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M9"), -next_id_infant) %>%
+        na.omit()
+str(M9)
+#426 10
+
+#prepare different outcomes measurements
+outcomes_M9 <- M9 %>% select(c(next_id_infant,
+                               infant_growth_WLZ_imputed_M9,
+                               infant_growth_BMIz_imputed_M9))
+                               #infant_asq_total_score_M9,
+                               #infant_asq_com_score_M9,
+                               #infant_asq_gm_score_M9,
+                               #infant_asq_fm_score_M9,
+                               #infant_asq_ps_score_M9,
+                               #infant_asq_psoc_score_M9))
+rownames(outcomes_M9) <- outcomes_M9$next_id_infant
+head(outcomes_M9)
+outcomes_M9$next_id_infant <- NULL
+#426 2
+
+#feeding_mode
+model_1_gday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_fm_M9)
+#2 10
+model_1_gday_fm_M9
+
+#clusters
+model_1_gday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_gday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_cl_M9)
+#2 10
+model_1_gday_cl_M9
+
+        #model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_gday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_fm_M9)
+#2 10
+model_2_gday_fm_M9
+
+#clusters
+model_2_gday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_gday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_cl_M9)
+#2 10
+model_2_gday_cl_M9
+
+        #model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_gday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_gday_M9 +
+                         M9$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clustergday_kcal",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_fm_M9)
+#2 10
+model_3_gday_fm_M9
+
+#clusters
+model_3_gday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_feeding_mode_simple_M9 +
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_gday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_cl_M9)
+#2 10
+model_3_gday_cl_M9
+
+        #model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_gday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9[,j] ~ 
+#                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9$infant_sex_misc_M9 +
+#                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9$cluster_gday_M9 +
+#                         M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M9$infant_ffq_feeding_mode_simple_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clustergday_kcal_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_fm_M9)
+#2 10
+#model_4_gday_fm_M9
+
+#clusters
+#model_4_gday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9[,j] ~ 
+#                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9$infant_sex_misc_M9 +
+#                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9$infant_ffq_feeding_mode_simple_M9 +
+#                         M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9$cluster_gday_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "dietary_pattern_gday",
+#                outcomes = colnames(outcomes_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_cl_M9)
+#2 10
+#model_4_gday_cl_M9
+
+                ####2.3 M12 diet w M12 outcomes: ####
+#M12 dataframe
+M12 <- masterfile %>% filter (
+        timepoint == "M12") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+                 infant_ffq_feeding_mode_simple,
+                 cluster_gday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_gm_score,
+                 infant_asq_fm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M12"), -next_id_infant) %>%
+        na.omit()
+str(M12)
+#358 16
+
+#prepare different outcomes measurements
+outcomes_M12 <- M12 %>% select(c(next_id_infant,
+                               infant_growth_WLZ_imputed_M12,
+                               infant_growth_BMIz_imputed_M12,
+                               infant_asq_total_score_M12,
+                               infant_asq_com_score_M12,
+                               infant_asq_gm_score_M12,
+                               infant_asq_fm_score_M12,
+                               infant_asq_ps_score_M12,
+                               infant_asq_psoc_score_M12))
+rownames(outcomes_M12) <- outcomes_M12$next_id_infant
+head(outcomes_M12)
+outcomes_M12$next_id_infant <- NULL
+#358 8
+
+        #crude model
+#feeding_mode
+model_1_gday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$infant_ffq_feeding_mode_simple_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_fm_M12)
+#8 10
+model_1_gday_fm_M12
+
+#clusters
+model_1_gday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_gday_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_cl_M12)
+#8 10
+model_1_gday_cl_M12
+
+        #model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_gday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_feeding_mode_simple_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_fm_M12)
+#8 10
+model_2_gday_fm_M12
+
+#clusters
+model_2_gday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_gday_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_cl_M12)
+#8 10
+model_2_gday_cl_M12
+
+        #model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_gday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_gday_M12 +
+                         M12$infant_ffq_feeding_mode_simple_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clustergday_kcal",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_fm_M12)
+#8 10
+model_3_gday_fm_M12
+
+#clusters
+model_3_gday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_feeding_mode_simple_M12 +
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_gday_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_cl_M12)
+#8 10
+model_3_gday_cl_M12
+
+        #model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_gday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M12[,j] ~ 
+#                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+#                         M12$infant_sex_misc_M12 +
+#                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+#                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+#                         M12$cluster_gday_M12 +
+#                         M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M12 +
+#                         M12$infant_ffq_feeding_mode_simple_M12)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clustergday_kcal_motherpreBMI",
+#                timepoint_predictor = "M12",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_fm_M12)
+#8 10
+#model_4_gday_fm_M12
+
+#clusters
+#model_4_gday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M12[,j] ~ 
+#                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+#                         M12$infant_sex_misc_M12 +
+#                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+#                         M12$infant_ffq_feeding_mode_simple_M12 +
+#                         M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M12 +
+#                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+#                         M12$cluster_gday_M12)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M12",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "dietary_pattern_gday",
+#                outcomes = colnames(outcomes_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_cl_M12)
+#8 10
+#model_4_gday_cl_M12
+
+                ####2.4 M6 diet w M9 outcomes: ####
+#M6_M9 dataframe
+M6_M9 <- full_join(M6, M9) %>%
+        na.omit()
+str(M6_M9)
+#318 25
+
+#prepare different outcomes measurements
+outcomes_M6_M9 <- M6_M9 %>% select(c(next_id_infant,
+                               infant_growth_WLZ_imputed_M9,
+                               infant_growth_BMIz_imputed_M9))
+rownames(outcomes_M6_M9) <- outcomes_M6_M9$next_id_infant
+head(outcomes_M6_M9)
+outcomes_M6_M9$next_id_infant <- NULL
+#485 8
+
+#feeding_mode
+model_1_gday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_fm_M6_M9)
+#2 10
+model_1_gday_fm_M6_M9
+
+#clusters
+model_1_gday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_cl_M6_M9)
+#2 10
+model_1_gday_cl_M6_M9
+
+        #model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_gday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_fm_M6_M9)
+#2 10
+model_2_gday_fm_M6_M9
+
+#clusters
+model_2_gday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_cl_M6_M9)
+#2 10
+model_2_gday_cl_M6_M9
+
+        #model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_gday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_gday_M6 +
+                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clustergday_kcal",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_fm_M6_M9)
+#2 10
+model_3_gday_fm_M6_M9
+
+#clusters
+model_3_gday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_feeding_mode_simple_M6 +
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_cl_M6_M9)
+#2 10
+model_3_gday_cl_M6_M9
+
+        #model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_gday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M9[,j] ~ 
+#                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M9$infant_sex_misc_M6 +
+#                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M9$cluster_gday_M6 +
+#                         M6_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clustergday_kcal_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M6_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_fm_M6_M9)
+#2 10
+#model_4_gday_fm_M6_M9
+
+#clusters
+#model_4_gday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M9[,j] ~ 
+#                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M9$infant_sex_misc_M6 +
+#                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M9$infant_ffq_feeding_mode_simple_M6 +
+#                         M6_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M9$cluster_gday_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "dietary_pattern_gday",
+#                outcomes = colnames(outcomes_M6_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_cl_M6_M9)
+##2 10
+#model_4_gday_cl_M6_M9
+
+                ####2.5 M6 diet w M12 outcomes: ####
+#M6_M12 dataframe
+M6_M12 <- full_join(M6, M12) %>% 
+        na.omit()
+str(M6_M12)
+#468 29
+
+#prepare different outcomes measurements
+outcomes_M6_M12 <- M6_M12 %>% select(c(next_id_infant,
+                                     infant_growth_WLZ_imputed_M12,
+                                     infant_growth_BMIz_imputed_M12,
+                                     infant_asq_total_score_M12,
+                                     infant_asq_com_score_M12,
+                                     infant_asq_gm_score_M12,
+                                     infant_asq_fm_score_M12,
+                                     infant_asq_ps_score_M12,
+                                     infant_asq_psoc_score_M12))
+rownames(outcomes_M6_M12) <- outcomes_M6_M12$next_id_infant
+head(outcomes_M6_M12)
+outcomes_M6_M12$next_id_infant <- NULL
+#468 8
+
+        #crude model
+#feeding_mode
+model_1_gday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_fm_M6_M12)
+#8 10
+model_1_gday_fm_M6_M12
+
+#clusters
+model_1_gday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_cl_M6_M12)
+#8 10
+model_1_gday_cl_M6_M12
+
+        #model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_gday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_fm_M6_M12)
+#8 10
+model_2_gday_fm_M6_M12
+
+#clusters
+model_2_gday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_cl_M6_M12)
+#8 10
+model_2_gday_cl_M6_M12
+
+        #model 3: model 2 corrected dietary feature
+#feeding_mode
+model_3_gday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_gday_M6 +
+                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clustergday_kcal",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_fm_M6_M12)
+#8 10
+model_3_gday_fm_M6_M12
+
+#clusters
+model_3_gday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_feeding_mode_simple_M6 +
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_gday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_cl_M6_M12)
+#8 10
+model_3_gday_cl_M6_M12
+
+        #model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_gday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M12[,j] ~ 
+#                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M12$infant_sex_misc_M6 +
+#                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M12$cluster_gday_M6 +
+#                         M6_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clustergday_kcal_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M6_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_fm_M6_M12)
+#8 10
+#model_4_gday_fm_M6_M12
+
+#clusters
+#model_4_gday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M12[,j] ~ 
+#                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M12$infant_sex_misc_M6 +
+#                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M12$infant_ffq_feeding_mode_simple_M6 +
+#                         M6_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M12$cluster_gday_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "dietary_pattern_gday",
+#                outcomes = colnames(outcomes_M6_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_cl_M6_M12)
+##8 10
+#model_4_gday_cl_M6_M12
+
+                ####2.6 M9 diet w M12 outcomes: ####
+#M9_M12 dataframe
+M9_M12 <- full_join(M9, M12) %>% 
+        na.omit()
+str(M9_M12)
+#497 27
+
+#prepare different outcomes measurements
+outcomes_M9_M12 <- M9_M12 %>% select(c(next_id_infant,
+                                       infant_growth_WLZ_imputed_M12,
+                                       infant_growth_BMIz_imputed_M12,
+                                       infant_asq_total_score_M12,
+                                       infant_asq_com_score_M12,
+                                       infant_asq_gm_score_M12,
+                                       infant_asq_fm_score_M12,
+                                       infant_asq_ps_score_M12,
+                                       infant_asq_psoc_score_M12))
+rownames(outcomes_M9_M12) <- outcomes_M9_M12$next_id_infant
+head(outcomes_M9_M12)
+outcomes_M9_M12$next_id_infant <- NULL
+#497 8
+
+        #crude model
+#feeding_mode
+model_1_gday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_fm_M9_M12)
+#8 10
+model_1_gday_fm_M9_M12
+
+#clusters
+model_1_gday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_gday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_gday_cl_M9_M12)
+#8 10
+model_1_gday_cl_M9_M12
+
+        #model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_gday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_fm_M9_M12)
+#8 10
+model_2_gday_fm_M9_M12
+
+#clusters
+model_2_gday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_gday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_gday_cl_M9_M12)
+#8 10
+model_2_gday_cl_M9_M12
+
+        #model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_gday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_gday_M9 +
+                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clustergday_kcal",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_fm_M9_M12)
+#8 10
+model_3_gday_fm_M9_M12
+
+#clusters
+model_3_gday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_feeding_mode_simple_M9 +
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_gday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_gday",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_gday_cl_M9_M12)
+#8 10
+model_3_gday_cl_M9_M12
+
+        #model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_gday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9_M12[,j] ~ 
+#                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9_M12$infant_sex_misc_M9 +
+#                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9_M12$cluster_gday_M9 +
+#                         M9_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M9 +
+#                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clustergday_kcal_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M9_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_fm_M9_M12)
+#8 10
+#model_4_gday_fm_M9_M12
+
+#clusters
+#model_4_gday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9_M12[,j] ~ 
+#                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9_M12$infant_sex_misc_M9 +
+#                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9_M12$infant_ffq_feeding_mode_simple_M9 +
+#                         M9_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M9 +
+#                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9_M12$cluster_gday_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "dietary_pattern_gday",
+#                outcomes = colnames(outcomes_M9_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_gday_cl_M9_M12)
+#8 10
+#model_4_gday_cl_M9_M12
+
+        ##### =========================== 3. FIT LINEAR MODELS: CALORIC INTAKE =========================== #####
+                ####3.1 M6 diet w M6 outcomes: ####
+#M6 dataframe
+M6 <- masterfile %>% filter (
+        timepoint == "M6") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, #not enough power and skewing data
+                 infant_ffq_feeding_mode_simple,
+                 cluster_kday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_gm_score,
+                 infant_asq_fm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M6"), -next_id_infant) %>% 
+        na.omit()
+str(M6)
+#377 16
+
+#prepare different outcomes measurements
+outcomes_M6 <- M6 %>% select(c(next_id_infant,
+                               infant_growth_WLZ_imputed_M6,
+                               infant_growth_BMIz_imputed_M6,
+                               infant_asq_total_score_M6,
+                               infant_asq_com_score_M6,
+                               infant_asq_gm_score_M6,
+                               infant_asq_fm_score_M6,
+                               infant_asq_ps_score_M6,
+                               infant_asq_psoc_score_M6))
+rownames(outcomes_M6) <- outcomes_M6$next_id_infant
+head(outcomes_M6)
+outcomes_M6$next_id_infant <- NULL
+#377 8
+
+#crude model
+#feeding_mode
+model_1_kday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_fm_M6)
+#8 10
+model_1_kday_fm_M6
+
+#clusters
+model_1_kday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_cl_M6)
+#8 10
+model_1_kday_cl_M6
+
+#model 2: model 1 corrected for demographics (gestational age, sex and birthweight)
+#feeding_mode
+model_2_kday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_fm_M6)
+#8 10
+model_2_kday_fm_M6
+
+#clusters
+model_2_kday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_cl_M6)
+#8 10
+model_2_kday_cl_M6
+
+#model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_kday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_kday_M6 +
+                         M6$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clusterkday_kcal",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_fm_M6)
+#8 10
+model_3_kday_fm_M6
+
+#clusters
+model_3_kday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6[,j] ~ 
+                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6$infant_sex_misc_M6 +
+                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6$infant_ffq_feeding_mode_simple_M6 +
+                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M6",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_cl_M6)
+#8 10
+model_3_kday_cl_M6
+
+#model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_kday_fm_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6[,j] ~ 
+#                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6$infant_sex_misc_M6 +
+#                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6$cluster_kday_M6 +
+#                         M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M6$infant_ffq_feeding_mode_simple_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clusterkday_kcal_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M6",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M6)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_fm_M6)
+#8 10
+#model_4_kday_fm_M6
+
+#clusters
+#model_4_kday_cl_M6 <- foreach(j = 1:ncol(outcomes_M6),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6[,j] ~ 
+#                         M6$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6$infant_sex_misc_M6 +
+#                         M6$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6$infant_ffq_feeding_mode_simple_M6 +
+#                         M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M6$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6$cluster_kday_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M6",
+#                dietary_feature = "dietary_pattern_kday",
+#                outcomes = colnames(outcomes_M6)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_cl_M6)
+#8 10
+#model_4_kday_cl_M6
+
+                ####3.2 M9 diet w M9 outcomes : ####
+#M9 dataframe
+M9 <- masterfile %>% filter (
+        timepoint == "M9") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+                 infant_ffq_feeding_mode_simple,
+                 cluster_kday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed)) %>%
+        #infant_asq_total_score, #ASQ not available at M9
+        #infant_asq_com_score,
+        #infant_asq_gm_score,
+        #infant_asq_fm_score,
+        #infant_asq_ps_score,
+        #infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M9"), -next_id_infant) %>%
+        na.omit()
+str(M9)
+#426 10
+
+#prepare different outcomes measurements
+outcomes_M9 <- M9 %>% select(c(next_id_infant,
+                               infant_growth_WLZ_imputed_M9,
+                               infant_growth_BMIz_imputed_M9))
+#infant_asq_total_score_M9,
+#infant_asq_com_score_M9,
+#infant_asq_gm_score_M9,
+#infant_asq_fm_score_M9,
+#infant_asq_ps_score_M9,
+#infant_asq_psoc_score_M9))
+rownames(outcomes_M9) <- outcomes_M9$next_id_infant
+head(outcomes_M9)
+outcomes_M9$next_id_infant <- NULL
+#426 2
+
+#feeding_mode
+model_1_kday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_fm_M9)
+#2 10
+model_1_kday_fm_M9
+
+#clusters
+model_1_kday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_kday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_cl_M9)
+#2 10
+model_1_kday_cl_M9
+
+#model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_kday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_fm_M9)
+#2 10
+model_2_kday_fm_M9
+
+#clusters
+model_2_kday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_kday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_cl_M9)
+#2 10
+model_2_kday_cl_M9
+
+#model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_kday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_kday_M9 +
+                         M9$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clusterkday_kcal",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_fm_M9)
+#2 10
+model_3_kday_fm_M9
+
+#clusters
+model_3_kday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9[,j] ~ 
+                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9$infant_sex_misc_M9 +
+                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9$infant_ffq_feeding_mode_simple_M9 +
+                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9$cluster_kday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_cl_M9)
+#2 10
+model_3_kday_cl_M9
+
+#model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_kday_fm_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9[,j] ~ 
+#                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9$infant_sex_misc_M9 +
+#                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9$cluster_kday_M9 +
+#                         M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M9$infant_ffq_feeding_mode_simple_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clusterkday_kcal_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_fm_M9)
+#2 10
+#model_4_kday_fm_M9
+
+#clusters
+#model_4_kday_cl_M9 <- foreach(j = 1:ncol(outcomes_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9[,j] ~ 
+#                         M9$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9$infant_sex_misc_M9 +
+#                         M9$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9$infant_ffq_feeding_mode_simple_M9 +
+#                         M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg +
+#                         M9$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9$cluster_kday_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "dietary_pattern_kday",
+#                outcomes = colnames(outcomes_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_cl_M9)
+#2 10
+#model_4_kday_cl_M9
+
+                ####3.3 M12 diet w M12 outcomes: ####
+#M12 dataframe
+M12 <- masterfile %>% filter (
+        timepoint == "M12") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+                 infant_ffq_feeding_mode_simple,
+                 cluster_kday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_gm_score,
+                 infant_asq_fm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M12"), -next_id_infant) %>%
+        na.omit()
+str(M12)
+#358 16
+
+#prepare different outcomes measurements
+outcomes_M12 <- M12 %>% select(c(next_id_infant,
+                                 infant_growth_WLZ_imputed_M12,
+                                 infant_growth_BMIz_imputed_M12,
+                                 infant_asq_total_score_M12,
+                                 infant_asq_com_score_M12,
+                                 infant_asq_gm_score_M12,
+                                 infant_asq_fm_score_M12,
+                                 infant_asq_ps_score_M12,
+                                 infant_asq_psoc_score_M12))
+rownames(outcomes_M12) <- outcomes_M12$next_id_infant
+head(outcomes_M12)
+outcomes_M12$next_id_infant <- NULL
+#358 8
+
+#crude model
+#feeding_mode
+model_1_kday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$infant_ffq_feeding_mode_simple_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_fm_M12)
+#8 10
+model_1_kday_fm_M12
+
+#clusters
+model_1_kday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_kday_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_cl_M12)
+#8 10
+model_1_kday_cl_M12
+
+#model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_kday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_feeding_mode_simple_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_fm_M12)
+#8 10
+model_2_kday_fm_M12
+
+#clusters
+model_2_kday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_kday_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_cl_M12)
+#8 10
+model_2_kday_cl_M12
+
+#model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_kday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_kday_M12 +
+                         M12$infant_ffq_feeding_mode_simple_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clusterkday_kcal",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_fm_M12)
+#8 10
+model_3_kday_fm_M12
+
+#clusters
+model_3_kday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M12[,j] ~ 
+                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+                         M12$infant_sex_misc_M12 +
+                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+                         M12$infant_ffq_feeding_mode_simple_M12 +
+                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+                         M12$cluster_kday_M12)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M12",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_cl_M12)
+#8 10
+model_3_kday_cl_M12
+
+#model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_kday_fm_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M12[,j] ~ 
+#                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+#                         M12$infant_sex_misc_M12 +
+#                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+#                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+#                         M12$cluster_kday_M12 +
+#                         M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M12 +
+#                         M12$infant_ffq_feeding_mode_simple_M12)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clusterkday_kcal_motherpreBMI",
+#                timepoint_predictor = "M12",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_fm_M12)
+#8 10
+#model_4_kday_fm_M12
+
+#clusters
+#model_4_kday_cl_M12 <- foreach(j = 1:ncol(outcomes_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M12[,j] ~ 
+#                         M12$mother_birthcardself_gestational_age_weeks_catg_M12 +
+#                         M12$infant_sex_misc_M12 +
+#                         M12$infant_growth_birth_weight_kg_imputed_M12 +
+#                         M12$infant_ffq_feeding_mode_simple_M12 +
+#                         M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M12 +
+#                         M12$infant_ffq_energy_kcalday_item_sum_recal_M12 +
+#                         M12$cluster_kday_M12)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M12",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "dietary_pattern_kday",
+#                outcomes = colnames(outcomes_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_cl_M12)
+#8 10
+#model_4_kday_cl_M12
+
+                ####3.4 M6 diet w M9 outcomes: ####
+#M6_M9 dataframe
+M6_M9 <- full_join(M6, M9) %>%
+        na.omit()
+str(M6_M9)
+#318 25
+
+#prepare different outcomes measurements
+outcomes_M6_M9 <- M6_M9 %>% select(c(next_id_infant,
+                                     infant_growth_WLZ_imputed_M9,
+                                     infant_growth_BMIz_imputed_M9))
+rownames(outcomes_M6_M9) <- outcomes_M6_M9$next_id_infant
+head(outcomes_M6_M9)
+outcomes_M6_M9$next_id_infant <- NULL
+#485 8
+
+#feeding_mode
+model_1_kday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_fm_M6_M9)
+#2 10
+model_1_kday_fm_M6_M9
+
+#clusters
+model_1_kday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_cl_M6_M9)
+#2 10
+model_1_kday_cl_M6_M9
+
+#model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_kday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_fm_M6_M9)
+#2 10
+model_2_kday_fm_M6_M9
+
+#clusters
+model_2_kday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_cl_M6_M9)
+#2 10
+model_2_kday_cl_M6_M9
+
+#model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_kday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_kday_M6 +
+                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clusterkday_kcal",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_fm_M6_M9)
+#2 10
+model_3_kday_fm_M6_M9
+
+#clusters
+model_3_kday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M9[,j] ~ 
+                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M9$infant_sex_misc_M6 +
+                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M9$infant_ffq_feeding_mode_simple_M6 +
+                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M9$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M9",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6_M9)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_cl_M6_M9)
+#2 10
+model_3_kday_cl_M6_M9
+
+#model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_kday_fm_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M9[,j] ~ 
+#                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M9$infant_sex_misc_M6 +
+#                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M9$cluster_kday_M6 +
+#                         M6_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M9$infant_ffq_feeding_mode_simple_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clusterkday_kcal_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M6_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_fm_M6_M9)
+#2 10
+#model_4_kday_fm_M6_M9
+
+#clusters
+#model_4_kday_cl_M6_M9 <- foreach(j = 1:ncol(outcomes_M6_M9),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M9[,j] ~ 
+#                         M6_M9$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M9$infant_sex_misc_M6 +
+#                         M6_M9$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M9$infant_ffq_feeding_mode_simple_M6 +
+#                         M6_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M9$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M9$cluster_kday_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M9",
+#                dietary_feature = "dietary_pattern_kday",
+#                outcomes = colnames(outcomes_M6_M9)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_cl_M6_M9)
+##2 10
+#model_4_kday_cl_M6_M9
+
+                ####3.5 M6 diet w M12 outcomes: ####
+#M6_M12 dataframe
+M6_M12 <- full_join(M6, M12) %>% 
+        na.omit()
+str(M6_M12)
+#468 29
+
+#prepare different outcomes measurements
+outcomes_M6_M12 <- M6_M12 %>% select(c(next_id_infant,
+                                       infant_growth_WLZ_imputed_M12,
+                                       infant_growth_BMIz_imputed_M12,
+                                       infant_asq_total_score_M12,
+                                       infant_asq_com_score_M12,
+                                       infant_asq_gm_score_M12,
+                                       infant_asq_fm_score_M12,
+                                       infant_asq_ps_score_M12,
+                                       infant_asq_psoc_score_M12))
+rownames(outcomes_M6_M12) <- outcomes_M6_M12$next_id_infant
+head(outcomes_M6_M12)
+outcomes_M6_M12$next_id_infant <- NULL
+#468 8
+
+#crude model
+#feeding_mode
+model_1_kday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_fm_M6_M12)
+#8 10
+model_1_kday_fm_M6_M12
+
+#clusters
+model_1_kday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_cl_M6_M12)
+#8 10
+model_1_kday_cl_M6_M12
+
+#model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_kday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_fm_M6_M12)
+#8 10
+model_2_kday_fm_M6_M12
+
+#clusters
+model_2_kday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_cl_M6_M12)
+#8 10
+model_2_kday_cl_M6_M12
+
+#model 3: model 2 corrected dietary feature
+#feeding_mode
+model_3_kday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_kday_M6 +
+                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clusterkday_kcal",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_fm_M6_M12)
+#8 10
+model_3_kday_fm_M6_M12
+
+#clusters
+model_3_kday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M6_M12[,j] ~ 
+                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+                         M6_M12$infant_sex_misc_M6 +
+                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+                         M6_M12$infant_ffq_feeding_mode_simple_M6 +
+                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+                         M6_M12$cluster_kday_M6)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M6",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M6_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_cl_M6_M12)
+#8 10
+model_3_kday_cl_M6_M12
+
+#model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_kday_fm_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M12[,j] ~ 
+#                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M12$infant_sex_misc_M6 +
+#                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M12$cluster_kday_M6 +
+#                         M6_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M12$infant_ffq_feeding_mode_simple_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clusterkday_kcal_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M6_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_fm_M6_M12)
+#8 10
+#model_4_kday_fm_M6_M12
+
+#clusters
+#model_4_kday_cl_M6_M12 <- foreach(j = 1:ncol(outcomes_M6_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M6_M12[,j] ~ 
+#                         M6_M12$mother_birthcardself_gestational_age_weeks_catg_M6 +
+#                         M6_M12$infant_sex_misc_M6 +
+#                         M6_M12$infant_growth_birth_weight_kg_imputed_M6 +
+#                         M6_M12$infant_ffq_feeding_mode_simple_M6 +
+#                         M6_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M6 +
+#                         M6_M12$infant_ffq_energy_kcalday_item_sum_recal_M6 +
+#                         M6_M12$cluster_kday_M6)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M6",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "dietary_pattern_kday",
+#                outcomes = colnames(outcomes_M6_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_cl_M6_M12)
+##8 10
+#model_4_kday_cl_M6_M12
+
+                ####3.6 M9 diet w M12 outcomes: ####
+#M9_M12 dataframe
+M9_M12 <- full_join(M9, M12) %>% 
+        na.omit()
+str(M9_M12)
+#497 27
+
+#prepare different outcomes measurements
+outcomes_M9_M12 <- M9_M12 %>% select(c(next_id_infant,
+                                       infant_growth_WLZ_imputed_M12,
+                                       infant_growth_BMIz_imputed_M12,
+                                       infant_asq_total_score_M12,
+                                       infant_asq_com_score_M12,
+                                       infant_asq_gm_score_M12,
+                                       infant_asq_fm_score_M12,
+                                       infant_asq_ps_score_M12,
+                                       infant_asq_psoc_score_M12))
+rownames(outcomes_M9_M12) <- outcomes_M9_M12$next_id_infant
+head(outcomes_M9_M12)
+outcomes_M9_M12$next_id_infant <- NULL
+#497 8
+
+#crude model
+#feeding_mode
+model_1_kday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_fm_M9_M12)
+#8 10
+model_1_kday_fm_M9_M12
+
+#clusters
+model_1_kday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_kday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "crude",
+                corrected_for = "NA",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_1_kday_cl_M9_M12)
+#8 10
+model_1_kday_cl_M9_M12
+
+#model 2: model 1 corrected for demographics (gestational age, sex, birth weight)
+#feeding_mode
+model_2_kday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_fm_M9_M12)
+#8 10
+model_2_kday_fm_M9_M12
+
+#clusters
+model_2_kday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_kday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_1",
+                corrected_for = "demographics",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_2_kday_cl_M9_M12)
+#8 10
+model_2_kday_cl_M9_M12
+
+#model 3: model 2 corrected for dietary feature
+#feeding_mode
+model_3_kday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_kday_M9 +
+                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_clusterkday_kcal",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "feeding_mode",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_fm_M9_M12)
+#8 10
+model_3_kday_fm_M9_M12
+
+#clusters
+model_3_kday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+        lm1 = lm(outcomes_M9_M12[,j] ~ 
+                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+                         M9_M12$infant_sex_misc_M9 +
+                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+                         M9_M12$infant_ffq_feeding_mode_simple_M9 +
+                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+                         M9_M12$cluster_kday_M9)
+        sum1 = summary(lm1)
+        summary_results = sum1$coef[nrow(sum1$coef),]
+        data.frame(
+                model = "adjusted_2",
+                corrected_for = "demographics_feedingmode",
+                timepoint_predictor = "M9",
+                timepoint_outcome = "M12",
+                dietary_feature = "dietary_pattern_kday",
+                outcomes = colnames(outcomes_M9_M12)[j],
+                Beta_coefficient = summary_results[1],
+                Standard_error = summary_results[2],
+                Statistic = summary_results[3],
+                P_value = summary_results[4])
+}
+dim(model_3_kday_cl_M9_M12)
+#8 10
+model_3_kday_cl_M9_M12
+
+#model 4: model 3 corrected for mother pre-pregnancy BMI
+#feeding_mode
+#model_4_kday_fm_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9_M12[,j] ~ 
+#                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9_M12$infant_sex_misc_M9 +
+#                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9_M12$cluster_kday_M9 +
+#                         M9_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M9 +
+#                         M9_M12$infant_ffq_feeding_mode_simple_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_clusterkday_kcal_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "feeding_mode",
+#                outcomes = colnames(outcomes_M9_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_fm_M9_M12)
+#8 10
+#model_4_kday_fm_M9_M12
+
+#clusters
+#model_4_kday_cl_M9_M12 <- foreach(j = 1:ncol(outcomes_M9_M12),.combine = rbind) %do% {
+#        lm1 = lm(outcomes_M9_M12[,j] ~ 
+#                         M9_M12$mother_birthcardself_gestational_age_weeks_catg_M9 +
+#                         M9_M12$infant_sex_misc_M9 +
+#                         M9_M12$infant_growth_birth_weight_kg_imputed_M9 +
+#                         M9_M12$infant_ffq_feeding_mode_simple_M9 +
+#                         M9_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg_M9 +
+#                         M9_M12$infant_ffq_energy_kcalday_item_sum_recal_M9 +
+#                         M9_M12$cluster_kday_M9)
+#        sum1 = summary(lm1)
+#        summary_results = sum1$coef[nrow(sum1$coef),]
+#        data.frame(
+#                model = "adjusted_3",
+#                corrected_for = "demographics_feedingmode_motherpreBMI",
+#                timepoint_predictor = "M9",
+#                timepoint_outcome = "M12",
+#                dietary_feature = "dietary_pattern_kday",
+#                outcomes = colnames(outcomes_M9_M12)[j],
+#                Beta_coefficient = summary_results[1],
+#                Standard_error = summary_results[2],
+#                Statistic = summary_results[3],
+#                P_value = summary_results[4])
+#}
+#dim(model_4_kday_cl_M9_M12)
+#8 10
+#model_4_kday_cl_M9_M12
+
+        ##### =========================== 4. WRITE COMBINED TABLE =========================== #####
+final_linear_models <- bind_rows(
+                                 ##M6 with M6##
+                                 #feeding mode       
+                                 model_1_gday_fm_M6, #1: crude model of feeding mode
+                                 model_2_gday_fm_M6, #2: adj demographics
+                                 model_3_gday_fm_M6, #3a: adj dietary ft: gday cluster
+                                 #model_4_gday_fm_M6, #4a: adj mother pre-pregn BMI (gday cluster)
+                                 model_3_kday_fm_M6, #3b: adj dietary ft: kcal cluster
+                                 #model_4_kday_fm_M6, #4b: adj mother pre-pregn BMI (kcalday cluster)
+                                 
+                                 #gday cluster
+                                 model_1_gday_cl_M6, #1: crude model of gday cluster
+                                 model_2_gday_cl_M6, #2: adj demographics
+                                 model_3_gday_cl_M6, #3: adj dietary ft: feeding mode
+                                 #model_4_gday_cl_M6, #4: adj mother pre-pregn BMI
+                                
+                                 #kcal cluster
+                                 model_1_kday_cl_M6, #1: crude model of kcal cluster
+                                 model_2_kday_cl_M6, #2: adj demographics
+                                 model_3_kday_cl_M6, #3: adj dietary ft: feeding mode
+                                 #model_4_kday_cl_M6, #4: adj mother pre-pregn BMI
+                                 
+                                 ##M9 with M9## 
+                                 #feeding mode       
+                                 model_1_gday_fm_M9, #1: crude model of feeding mode
+                                 model_2_gday_fm_M9, #2: adj demographics
+                                 model_3_gday_fm_M9, #3a: adj dietary ft: gday cluster
+                                 #model_4_gday_fm_M9, #4a: adj mother pre-pregn BMI (gday cluster)
+                                 model_3_kday_fm_M9, #3b: adj dietary ft: kcal cluster
+                                 #model_4_kday_fm_M9, #4b: adj mother pre-pregn BMI (kcalday cluster)
+                                 
+                                 #gday cluster
+                                 model_1_gday_cl_M9, #1: crude model of gday cluster
+                                 model_2_gday_cl_M9, #2: adj demographics
+                                 model_3_gday_cl_M9, #3: adj dietary ft: feeding mode
+                                 #model_4_gday_cl_M9, #4: adj mother pre-pregn BMI
+                                 
+                                 #kcal cluster
+                                 model_1_kday_cl_M9, #1: crude model of kcal cluster
+                                 model_2_kday_cl_M9, #2: adj demographics
+                                 model_3_kday_cl_M9, #3: adj dietary ft: feeding mode
+                                 #model_4_kday_cl_M9, #4: adj mother pre-pregn BMI
+                                 
+                                 ##M12 with M12## 
+                                 #feeding mode       
+                                 model_1_gday_fm_M12, #1: crude model of feeding mode
+                                 model_2_gday_fm_M12, #2: adj demographics
+                                 model_3_gday_fm_M12, #3a: adj dietary ft: gday cluster
+                                 #model_4_gday_fm_M12, #4a: adj mother pre-pregn BMI (gday cluster)
+                                 model_3_kday_fm_M12, #3b: adj dietary ft: kcal cluster
+                                 #model_4_kday_fm_M12, #4b: adj mother pre-pregn BMI (kcalday cluster)
+                                 
+                                 #gday cluster
+                                 model_1_gday_cl_M12, #1: crude model of gday cluster
+                                 model_2_gday_cl_M12, #2: adj demographics
+                                 model_3_gday_cl_M12, #3: adj dietary ft: feeding mode
+                                 #model_4_gday_cl_M12, #4: adj mother pre-pregn BMI
+                                 
+                                 #kcal cluster
+                                 model_1_kday_cl_M12, #1: crude model of kcal cluster
+                                 model_2_kday_cl_M12, #2: adj demographics
+                                 model_3_kday_cl_M12, #3: adj dietary ft: feeding mode
+                                 #model_4_kday_cl_M12, #4: adj mother pre-pregn BMI
+                                 
+                                 ##M6 with M9## 
+                                 #feeding mode       
+                                 model_1_gday_fm_M6_M9, #1: crude model of feeding mode
+                                 model_2_gday_fm_M6_M9, #2: adj demographics
+                                 model_3_gday_fm_M6_M9, #3a: adj dietary ft: gday cluster
+                                 #model_4_gday_fm_M6_M9, #4a: adj mother pre-pregn BMI (gday cluster)
+                                 model_3_kday_fm_M6_M9, #3b: adj dietary ft: kcal cluster
+                                 #model_4_kday_fm_M6_M9, #4b: adj mother pre-pregn BMI (kcalday cluster)
+                                 
+                                 #gday cluster
+                                 model_1_gday_cl_M6_M9, #1: crude model of gday cluster
+                                 model_2_gday_cl_M6_M9, #2: adj demographics
+                                 model_3_gday_cl_M6_M9, #3: adj dietary ft: feeding mode
+                                 #model_4_gday_cl_M6_M9, #4: adj mother pre-pregn BMI
+                                 
+                                 #kcal cluster
+                                 model_1_kday_cl_M6_M9, #1: crude model of kcal cluster
+                                 model_2_kday_cl_M6_M9, #2: adj demographics
+                                 model_3_kday_cl_M6_M9, #3: adj dietary ft: feeding mode
+                                 #model_4_kday_cl_M6_M9, #4: adj mother pre-pregn BMI
+                                 
+                                 ##M6 with M12## 
+                                 #feeding mode       
+                                 model_1_gday_fm_M6_M12, #1: crude model of feeding mode
+                                 model_2_gday_fm_M6_M12, #2: adj demographics
+                                 model_3_gday_fm_M6_M12, #3a: adj dietary ft: gday cluster
+                                 #model_4_gday_fm_M6_M12, #4a: adj mother pre-pregn BMI (gday cluster)
+                                 model_3_kday_fm_M6_M12, #3b: adj dietary ft: kcal cluster
+                                 #model_4_kday_fm_M6_M12, #4b: adj mother pre-pregn BMI (kcalday cluster)
+                                 
+                                 #gday cluster
+                                 model_1_gday_cl_M6_M12, #1: crude model of gday cluster
+                                 model_2_gday_cl_M6_M12, #2: adj demographics
+                                 model_3_gday_cl_M6_M12, #3: adj dietary ft: feeding mode
+                                 #model_4_gday_cl_M6_M12, #4: adj mother pre-pregn BMI
+                                 
+                                 #kcal cluster
+                                 model_1_kday_cl_M6_M12, #1: crude model of kcal cluster
+                                 model_2_kday_cl_M6_M12, #2: adj demographics
+                                 model_3_kday_cl_M6_M12, #3: adj dietary ft: feeding mode
+                                 #model_4_kday_cl_M6_M12, #4: adj mother pre-pregn BMI
+                                 
+                                 ##M9 with M12## 
+                                 #feeding mode       
+                                 model_1_gday_fm_M9_M12, #1: crude model of feeding mode
+                                 model_2_gday_fm_M9_M12, #2: adj demographics
+                                 model_3_gday_fm_M9_M12, #3a: adj dietary ft: gday cluster
+                                 #model_4_gday_fm_M9_M12, #4a: adj mother pre-pregn BMI (gday cluster)
+                                 model_3_kday_fm_M9_M12, #3b: adj dietary ft: kcal cluster
+                                 #model_4_kday_fm_M9_M12, #4b: adj mother pre-pregn BMI (kcalday cluster)
+                                 
+                                 #gday cluster
+                                 model_1_gday_cl_M9_M12, #1: crude model of gday cluster
+                                 model_2_gday_cl_M9_M12, #2: adj demographics
+                                 model_3_gday_cl_M9_M12, #3: adj dietary ft: feeding mode
+                                 #model_4_gday_cl_M9_M12, #4: adj mother pre-pregn BMI
+                                 
+                                 #kcal cluster
+                                 model_1_kday_cl_M9_M12, #1: crude model of kcal cluster
+                                 model_2_kday_cl_M9_M12, #2: adj demographics
+                                 model_3_kday_cl_M9_M12, #3: adj dietary ft: feeding mode
+                                 #model_4_kday_cl_M9_M12 #4: adj mother pre-pregn BMI
+                                 
+)
+#360 10
+
+final_linear_models <- final_linear_models %>% 
+        select(-timepoint_outcome) %>% 
+        unite("predictor", dietary_feature, timepoint_predictor) %>%
+        relocate(corrected_for, .after = outcomes) %>%
+        rename(outcome = outcomes)
+
+str(final_linear_models)
+#360 8
+final_linear_models <- final_linear_models %>% mutate_if(is.character, as.factor)
+final_linear_models$FDR = p.adjust(final_linear_models$P_value, method = "BH")
+sum(final_linear_models$FDR<0.05)
+#0
+sum(final_linear_models$P_value<0.05)
+#67
+
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/linear_regressions/")
+write.table(final_linear_models, "2024_04_22_infant_diet_growth_development_updated.txt", sep="\t", row.names=F, quote = F) 
+rm(list=ls())
