@@ -1,5 +1,5 @@
 ##     SCRIPT: DIETARY CLUSTERS: METADATA CORRELATIONS
-###     AUTHOR(S): JSIOBHAN BRUSHETT
+###     AUTHOR(S): SIOBHAN BRUSHETT
 ###     DESCRIPTION: DIETARY CLUSTERS: METADATA CORRELATIONS 
 ###     LAST UPDATED: 30 APRIL 2024
 ###     NOTE(S): 
@@ -14,12 +14,10 @@ library(tidyverse)
 
         ##### =========================== 0. LOAD FILES =========================== #####
 #masterfile
-setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
 masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
 #10230 196
 
 #dietary clusters
-setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/latent_profile_analysis/RE_ Results LPA/")
 dietary_clusters <- read.delim("infant_LPA_dietary_clusters_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
 #1622 8
 
@@ -29,7 +27,6 @@ masterfile <- full_join(masterfile, dietary_clusters)
 rm(dietary_clusters)
 
 #masterfile selection for comparing clusters with metadata
-#setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/dietary_clusters_metadata_sankey/")
 #selection_test <- read.delim("dietary_cluster_metadata_correlation_selection.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
 
 #table(selection_test$correlation_dietary_cluster) #38
