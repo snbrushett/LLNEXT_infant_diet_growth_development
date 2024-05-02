@@ -1,0 +1,1141 @@
+###     SCRIPT: SUMMARY STATISTICS: TABLE 1. Maternal and infant characteristics in relation to infant feeding mode at ages 6, 9 and 12 months.
+###     AUTHOR(S): SIOBHAN BRUSHETT
+###     DESCRIPTION: SUMMARY STATISTICS OF METADATA WITH FEEDING MODE
+###     PROJECT: LL-NEXT: PHR
+###     LAST UPDATED: 29 APRIL 2024
+###     NOTE(S):
+
+library(tidyverse)
+library(agricolae)
+
+## Contents of this file
+
+## 0. LOAD FILE
+## 1. METADATA DISTRIBUTION
+## 2. SUMMARY STATISTICS: M6 
+## 3. SUMMARY STATISTICS: M9
+## 4. SUMMARY STATISTICS: M12
+
+
+        ##### =========================== 0. LOAD FILE =========================== #####
+#masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+        ##### =========================== 1. METADATA DISTRIBUTION =========================== #####
+#pre-pregnancy bmi and parity in accordance with article: https://bmcpediatr.biomedcentral.com/articles/10.1186/s12887-020-02456-4#Sec2
+
+#mother pre-pregnancy BMI
+hist(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2[masterfile$timepoint=="M12"])
+dev.off()
+table(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2[masterfile$timepoint=="M12"], useNA = "ifany")
+masterfile <- masterfile %>% 
+        mutate(mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg = ifelse (mother_lifelinesbirthcards_prepreg_bmi_kg_m2<18.5, "underweight",
+                                                                           ifelse(mother_lifelinesbirthcards_prepreg_bmi_kg_m2>=18.5 &
+                                                                                          mother_lifelinesbirthcards_prepreg_bmi_kg_m2<25, "normal",
+                                                                                  ifelse(mother_lifelinesbirthcards_prepreg_bmi_kg_m2>=25, "overweight_obese", NA))))
+masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg <- factor(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, levels=c("underweight",
+                                                                                                                                              "normal",
+                                                                                                                                              "overweight_obese"))
+
+table(masterfile$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg[masterfile$timepoint=="M12"], useNA = "ifany")
+
+#parity
+hist(masterfile$mother_birthcard_parity[masterfile$timepoint=="M12"])
+dev.off()
+masterfile <- masterfile %>% 
+        mutate(mother_birthcard_parity_catg = ifelse (mother_birthcard_parity==1, "primiparous", "multiparous")) %>%
+        mutate_if(is.character, as.factor)
+masterfile$mother_birthcard_parity_catg <- factor(masterfile$mother_birthcard_parity_catg, levels = c("primiparous", "multiparous"))
+table(masterfile$mother_birthcard_parity_catg[masterfile$timepoint=="M12"])
+
+#gestational age
+hist(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"])
+dev.off()
+table(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"], useNA="ifany")
+
+#masterfile <- masterfile %>% 
+#        mutate(mother_birthcardself_gestational_age_weeks_catg = ifelse(mother_birthcardself_gestational_age_weeks < 32, "very_pre_term",
+#                                                                        ifelse(mother_birthcardself_gestational_age_weeks >= 32 & mother_birthcardself_gestational_age_weeks <36.9, "moderate_pre_term",
+#                                                                               ifelse(mother_birthcardself_gestational_age_weeks >= 36.9 & mother_birthcardself_gestational_age_weeks <41.9, "term",
+#                                                                                      ifelse(mother_birthcardself_gestational_age_weeks >= 41.9, "post_term", NA))))) %>%
+#        mutate_if(is.character, as.factor)
+
+#table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#masterfile$mother_birthcardself_gestational_age_weeks_catg <- factor(masterfile$mother_birthcardself_gestational_age_weeks_catg, levels = c("very_pre_term", 
+#                                                                                                    "moderate_pre_term", 
+#                                                                                                    "term",
+#                                                                                                    "post_term"))
+#table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#very_pre_term          moderate_pre_term       term            post_term           <NA>
+#20                     510                     7540                80              2080 
+
+masterfile <- masterfile %>% 
+        mutate(mother_birthcardself_gestational_age_weeks_catg = ifelse(mother_birthcardself_gestational_age_weeks <36.9, "pre_term",
+                                                                        ifelse(mother_birthcardself_gestational_age_weeks >= 36.9, "term", NA))) %>%
+        mutate_if(is.character, as.factor)
+
+table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#pre_term     term     <NA> 
+#530     7620     2080 
+
+#birth weight
+hist(masterfile$infant_growth_birth_weight_kg)
+hist(masterfile$infant_growth_birth_weight_kg_imputed)
+dev.off()
+
+#breastfeeding stopped
+table(masterfile$infant_ffq_breastfeeding_stopped_months, useNA = "ifany")
+masterfile$infant_ffq_breastfeeding_stopped_months <- as.character(masterfile$infant_ffq_breastfeeding_stopped_months)
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="1,5"] <- "2"
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="4,5"] <- "5"
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="10,5"] <- "11"
+masterfile$infant_ffq_breastfeeding_stopped_months <- as.numeric(masterfile$infant_ffq_breastfeeding_stopped_months)
+
+hist(masterfile$infant_ffq_breastfeeding_stopped_months)
+
+masterfile <- masterfile %>% 
+        mutate(infant_ffq_breastfeeding_stopped_months_catg = ifelse(infant_ffq_breastfeeding_stopped_months == 0, "never_BF",
+                                                                     ifelse(infant_ffq_breastfeeding_stopped_months>0 &
+                                                                                    infant_ffq_breastfeeding_stopped_months<6, "<6_months",
+                                                                            ifelse(infant_ffq_breastfeeding_stopped_months>=6, ">=6_months", NA))))
+
+
+masterfile$infant_ffq_breastfeeding_stopped_months_catg <- factor(masterfile$infant_ffq_breastfeeding_stopped_months_catg, levels=c("never_BF",
+                                                                                                                                    "<6_months",
+                                                                                                                                    ">=6_months"))
+
+table(masterfile$infant_ffq_breastfeeding_stopped_months_catg, useNA = "ifany")
+
+#timing food introduction
+table(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months, useNA = "ifany")
+hist(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months[masterfile$timepoint=="M12"])
+
+masterfile <- masterfile %>% 
+        mutate(infant_ffq_pureed_fruit_veg_intro_age_months_catg = ifelse(infant_ffq_pureed_fruit_veg_intro_age_months<4, "<4_months",
+                                                                          ifelse(infant_ffq_pureed_fruit_veg_intro_age_months>=4 & infant_ffq_pureed_fruit_veg_intro_age_months<=6, "4_6_months",
+                                                                                 ifelse(infant_ffq_pureed_fruit_veg_intro_age_months>6, ">6_months", NA))))
+masterfile$infant_ffq_pureed_fruit_veg_intro_age_months_catg <- factor(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months_catg, levels=c("<4_months",
+                                                                                                                                              "4_6_months",
+                                                                                                                                              ">6_months"))
+
+table(masterfile$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+
+#total caloric intake (kcal) at M12
+hist(masterfile$infant_ffq_energy_kcalday_item_sum_recal[masterfile$timepoint=="M12"])
+
+        ##### =========================== 2. SUMMARY STATISTICS: M6 =========================== #####
+        ##### 2.1. ALL: M6 #####
+#subset masterfile based on availability of dietary data and criteria at M6
+infant_ffq_M6 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M6") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+str(infant_ffq_M6)
+#564  22
+
+#criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M6 <- infant_ffq_M6 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#558 22
+
+#criteria 2: remove food groups where less than 5% (27.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- infant_ffq_M6 %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_gday_item_sum_recal))
+#558 18
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+#(5*558)/100 #27.9
+
+#therefore remove dairy (n=10) and meat substitutes (n=9)
+infant_ffq_M6 <- infant_ffq_M6 %>% 
+        select(-c(dairy, meat_substitute)) #food groups with less than 5% (n=27.9) of participants indicating "yes", irrespective of feeding mode
+
+#558 20
+
+rm(criteria_2)
+
+#prepare masterfile for summary statistics
+masterfile_M6_subset <- masterfile %>% 
+        filter(timepoint == "M6") %>% 
+        filter(next_id_infant %in% infant_ffq_M6$next_id_infant)
+#558 201
+masterfile_M6_subset$timepoint <- as.factor(as.character(masterfile_M6_subset$timepoint))
+summary(masterfile_M6_subset)
+
+#we data for infants for at least on of the variables of interest for 1,017 infants in total 
+#(558/1017)*100 --> 54.86726
+
+        #mother characteristics
+#pre-pregnancy bmi
+table(masterfile_M6_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+#parity
+table(masterfile_M6_subset$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$mother_birthcard_parity_catg))*100
+
+#delivery
+table(masterfile_M6_subset$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$birth_deliverybirthcard_mode_binary))*100
+
+#education
+table(masterfile_M6_subset$mother_education_p18, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$mother_education_p18))*100
+
+#smoking history
+table(masterfile_M6_subset$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$mother_health_smoked_one_whole_year_p18))*100
+
+        #infant characteristics
+#infant sex
+table(masterfile_M6_subset$infant_sex_misc, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$infant_sex_misc))*100
+
+#gestational age
+table(masterfile_M6_subset$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$mother_birthcardself_gestational_age_weeks_catg))*100
+
+#birth weight
+summary(masterfile_M6_subset$infant_growth_birth_weight_kg)
+sd(masterfile_M6_subset$infant_growth_birth_weight_kg, na.rm=T)
+
+#timing food introduction
+#summary(masterfile_M6_subset$infant_ffq_pureed_fruit_veg_intro_age_months)
+#IQR(masterfile_M6_subset$infant_ffq_pureed_fruit_veg_intro_age_months, na.rm = T)
+table(masterfile_M6_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+prop.table(table(masterfile_M6_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+#consumption
+hist(masterfile_M6_subset$infant_ffq_gday_item_sum_recal)
+dev.off()
+summary(masterfile_M6_subset$infant_ffq_gday_item_sum_recal)
+IQR(masterfile_M6_subset$infant_ffq_gday_item_sum_recal, na.rm = T)
+
+#caloric intake
+hist(masterfile_M6_subset$infant_ffq_energy_kcalday_item_sum_recal)
+dev.off()
+summary(masterfile_M6_subset$infant_ffq_energy_kcalday_item_sum_recal)
+IQR(masterfile_M6_subset$infant_ffq_energy_kcalday_item_sum_recal, na.rm = T)
+
+        ##### 2.2. FEEDING MODE: M6 #####
+NBF_M6 <- masterfile_M6_subset %>% 
+        filter(infant_ffq_feeding_mode_simple=="NBF") %>%
+        filter(timepoint=="M6")
+#240 201
+table(NBF_M6$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+BF_M6 <- masterfile_M6_subset %>% 
+        filter(infant_ffq_feeding_mode_simple=="BF") %>%
+        filter(timepoint=="M6")
+#318 208
+table(BF_M6$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+        #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(NBF_M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(BF_M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(BF_M6$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_birthcard_parity_catg
+table1 <- table(NBF_M6$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(BF_M6$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(BF_M6$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$mother_birthcard_parity_catg,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+        #birth_deliverybirthcard_mode_binary
+table1 <- table(NBF_M6$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(BF_M6$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(BF_M6$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$birth_deliverybirthcard_mode_binary,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+        #mother_education_p18
+table1 <- table(NBF_M6$mother_education_p18, useNA = "ifany")
+table2 <- table(BF_M6$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$mother_education_p18))*100
+prop_table2 <- prop.table(table(BF_M6$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$mother_education_p18,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+        #mother_health_smoked_one_whole_year_p18
+table1 <- table(NBF_M6$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(BF_M6$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(BF_M6$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$mother_health_smoked_one_whole_year_p18,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+        #infant_sex_misc
+table1 <- table(NBF_M6$infant_sex_misc, useNA = "ifany")
+table2 <- table(BF_M6$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$infant_sex_misc))*100
+prop_table2 <- prop.table(table(BF_M6$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$infant_sex_misc,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(NBF_M6$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(BF_M6$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(BF_M6$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#infant_growth_birth_weight_kg
+hist(masterfile_M6_subset$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+mean(NBF_M6$infant_growth_birth_weight_kg, na.rm=T)
+sd(NBF_M6$infant_growth_birth_weight_kg, na.rm=T)
+
+mean(BF_M6$infant_growth_birth_weight_kg, na.rm=T)
+sd(BF_M6$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ infant_ffq_feeding_mode_simple, data = masterfile_M6_subset)
+
+#infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(NBF_M6$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(BF_M6$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M6$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(BF_M6$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M6_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M6_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M6_subset$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(NBF_M6$infant_ffq_gday_item_sum_recal)
+summary(BF_M6$infant_ffq_gday_item_sum_recal)
+
+median(NBF_M6$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(NBF_M6$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(BF_M6$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(BF_M6$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6_subset$infant_ffq_gday_item_sum_recal ~ masterfile_M6_subset$infant_ffq_feeding_mode_simple)
+test$p.value
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M6_subset$infant_ffq_energy_kcalday_item_sum_recal) #right skewed
+dev.off()
+
+summary(NBF_M6$infant_ffq_energy_kcalday_item_sum_recal)
+summary(BF_M6$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(NBF_M6$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(NBF_M6$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+median(BF_M6$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(BF_M6$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M6_subset$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M6_subset$infant_ffq_feeding_mode_simple)
+test$p.value
+
+        ##### =========================== 3. SUMMARY STATISTICS: M9 =========================== #####
+        ##### 3.1. ALL: M9 #####
+#subset masterfile based on availability of dietary data and criteria at M9
+infant_ffq_M9 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M9") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday"))
+#586 25
+
+#criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M9 <- infant_ffq_M9 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#586 25
+
+#criteria 2: remove food groups where less than 5% (29.3) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- infant_ffq_M9 %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_gday_item_sum_recal))
+#586 21
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+#(5*586)/100 #29.3
+
+#therefore remove savoury snacks (n=25)
+infant_ffq_M9 <- infant_ffq_M9 %>% 
+        select(-savoury_snacks) #food groups with less than 5% (n=29.3) of participants indicating "yes", irrespective of feeding mode
+
+#586 24
+summary(infant_ffq_M9)
+rm(criteria_2)
+
+#prepare masterfile for summary statistics
+masterfile_M9_subset <- masterfile %>% 
+        filter(timepoint == "M9") %>% 
+        filter(next_id_infant %in% infant_ffq_M9$next_id_infant)
+#586 201
+masterfile_M9_subset$timepoint <- as.factor(as.character(masterfile_M9_subset$timepoint))
+summary(masterfile_M9_subset)
+
+#we data for infants for at least on of the variables of interest for 1,017 infants in total 
+#(586/1017)*100 --> 57.62045
+
+        #mother characteristics
+#pre-pregnancy bmi
+table(masterfile_M9_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+#parity
+table(masterfile_M9_subset$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$mother_birthcard_parity_catg))*100
+
+#delivery
+table(masterfile_M9_subset$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$birth_deliverybirthcard_mode_binary))*100
+
+#education
+table(masterfile_M9_subset$mother_education_p18, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$mother_education_p18))*100
+
+#smoking history
+table(masterfile_M9_subset$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$mother_health_smoked_one_whole_year_p18))*100
+
+        #infant characteristics
+#infant sex
+table(masterfile_M9_subset$infant_sex_misc, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$infant_sex_misc))*100
+
+#gestational age
+table(masterfile_M9_subset$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$mother_birthcardself_gestational_age_weeks_catg))*100
+
+#birth weight
+summary(masterfile_M9_subset$infant_growth_birth_weight_kg)
+sd(masterfile_M9_subset$infant_growth_birth_weight_kg, na.rm=T)
+
+#timing food introduction
+#summary(masterfile_M9_subset$infant_ffq_pureed_fruit_veg_intro_age_months)
+#IQR(masterfile_M9_subset$infant_ffq_pureed_fruit_veg_intro_age_months, na.rm = T)
+table(masterfile_M9_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+prop.table(table(masterfile_M9_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M9_subset$infant_ffq_gday_item_sum_recal)
+dev.off()
+summary(masterfile_M9_subset$infant_ffq_gday_item_sum_recal)
+IQR(masterfile_M9_subset$infant_ffq_gday_item_sum_recal, na.rm = T)
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M9_subset$infant_ffq_energy_kcalday_item_sum_recal)
+dev.off()
+summary(masterfile_M9_subset$infant_ffq_energy_kcalday_item_sum_recal)
+IQR(masterfile_M9_subset$infant_ffq_energy_kcalday_item_sum_recal, na.rm = T)
+
+        ##### 3.2. FEEDING MODE: M9 #####
+NBF_M9 <- masterfile_M9_subset %>% 
+        filter(infant_ffq_feeding_mode_simple=="NBF") %>%
+        filter(timepoint=="M9")
+#345 201
+table(NBF_M9$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+BF_M9 <- masterfile_M9_subset %>% 
+        filter(infant_ffq_feeding_mode_simple=="BF") %>%
+        filter(timepoint=="M9")
+#241 208
+table(BF_M9$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+#mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(NBF_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(BF_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(BF_M9$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+#mother_birthcard_parity_catg
+table1 <- table(NBF_M9$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(BF_M9$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(BF_M9$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$mother_birthcard_parity_catg,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#birth_deliverybirthcard_mode_binary
+table1 <- table(NBF_M9$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(BF_M9$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(BF_M9$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$birth_deliverybirthcard_mode_binary,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#mother_education_p18
+table1 <- table(NBF_M9$mother_education_p18, useNA = "ifany")
+table2 <- table(BF_M9$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$mother_education_p18))*100
+prop_table2 <- prop.table(table(BF_M9$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$mother_education_p18,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+#mother_health_smoked_one_whole_year_p18
+table1 <- table(NBF_M9$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(BF_M9$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(BF_M9$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$mother_health_smoked_one_whole_year_p18,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#infant_sex_misc
+table1 <- table(NBF_M9$infant_sex_misc, useNA = "ifany")
+table2 <- table(BF_M9$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$infant_sex_misc))*100
+prop_table2 <- prop.table(table(BF_M9$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$infant_sex_misc,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(NBF_M9$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(BF_M9$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(BF_M9$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#infant_growth_birth_weight_kg
+hist(masterfile_M9_subset$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+mean(NBF_M9$infant_growth_birth_weight_kg, na.rm=T)
+sd(NBF_M9$infant_growth_birth_weight_kg, na.rm=T)
+
+mean(BF_M9$infant_growth_birth_weight_kg, na.rm=T)
+sd(BF_M9$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ infant_ffq_feeding_mode_simple, data = masterfile_M9_subset)
+
+#infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(NBF_M9$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(BF_M9$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M9$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(BF_M9$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M9_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M9_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M9_subset$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(NBF_M9$infant_ffq_gday_item_sum_recal)
+summary(BF_M9$infant_ffq_gday_item_sum_recal)
+
+median(NBF_M9$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(NBF_M9$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(BF_M9$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(BF_M9$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M9_subset$infant_ffq_gday_item_sum_recal ~ masterfile_M9_subset$infant_ffq_feeding_mode_simple)
+test$p.value
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M9_subset$infant_ffq_energy_kcalday_item_sum_recal) #right skewed
+dev.off()
+
+summary(NBF_M9$infant_ffq_energy_kcalday_item_sum_recal)
+summary(BF_M9$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(NBF_M9$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(NBF_M9$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+median(BF_M9$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(BF_M9$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M9_subset$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M9_subset$infant_ffq_feeding_mode_simple)
+test$p.value
+
+        ##### =========================== 4. SUMMARY STATISTICS: M12 =========================== #####
+        ##### 4.1. M12 #####
+#subset masterfile based on availability of dietary data and criteria at M12
+infant_ffq_M12 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M12") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday"))
+#478 25
+
+#criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M12 <- infant_ffq_M12 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#478 25
+
+#criteria 2: remove food groups where less than 5% (23.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- infant_ffq_M12 %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_gday_item_sum_recal))
+#478 21
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+#(5*478)/100 #23.9
+#no items were removed as they were all well above 23.9
+rm(criteria_2)
+
+#prepare masterfile for summary statistics
+masterfile_M12_subset <- masterfile %>% 
+        filter(timepoint == "M12") %>% 
+        filter(next_id_infant %in% infant_ffq_M12$next_id_infant)
+#478 201
+masterfile_M12_subset$timepoint <- as.factor(as.character(masterfile_M12_subset$timepoint))
+summary(masterfile_M12_subset)
+
+#we data for infants for at least on of the variables of interest for 1,017 infants in total 
+#(478/1017)*100 --> 57.62045
+
+        #mother characteristics
+#pre-pregnancy bmi
+table(masterfile_M12_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+#parity
+table(masterfile_M12_subset$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$mother_birthcard_parity_catg))*100
+
+#delivery
+table(masterfile_M12_subset$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$birth_deliverybirthcard_mode_binary))*100
+
+#education
+table(masterfile_M12_subset$mother_education_p18, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$mother_education_p18))*100
+
+#smoking history
+table(masterfile_M12_subset$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$mother_health_smoked_one_whole_year_p18))*100
+
+        #infant characteristics
+#infant sex
+table(masterfile_M12_subset$infant_sex_misc, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$infant_sex_misc))*100
+
+#gestational age
+table(masterfile_M12_subset$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$mother_birthcardself_gestational_age_weeks_catg))*100
+
+#birth weight
+summary(masterfile_M12_subset$infant_growth_birth_weight_kg)
+sd(masterfile_M12_subset$infant_growth_birth_weight_kg, na.rm=T)
+
+#timing food introduction
+#summary(masterfile_M12_subset$infant_ffq_pureed_fruit_veg_intro_age_months)
+#IQR(masterfile_M12_subset$infant_ffq_pureed_fruit_veg_intro_age_months, na.rm = T)
+table(masterfile_M12_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+prop.table(table(masterfile_M12_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+#infant_ffq_gday_item_sum_recal
+hist(masterfile_M12_subset$infant_ffq_gday_item_sum_recal)
+dev.off()
+summary(masterfile_M12_subset$infant_ffq_gday_item_sum_recal)
+IQR(masterfile_M12_subset$infant_ffq_gday_item_sum_recal, na.rm = T)
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M12_subset$infant_ffq_energy_kcalday_item_sum_recal)
+dev.off()
+summary(masterfile_M12_subset$infant_ffq_energy_kcalday_item_sum_recal)
+IQR(masterfile_M12_subset$infant_ffq_energy_kcalday_item_sum_recal, na.rm = T)
+
+        ##### 4.2. FEEDING MODE: M12 #####
+NBF_M12 <- masterfile_M12_subset %>% 
+        filter(infant_ffq_feeding_mode_simple=="NBF") %>%
+        filter(timepoint=="M12")
+#328 201
+table(NBF_M12$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+BF_M12 <- masterfile_M12_subset %>% 
+        filter(infant_ffq_feeding_mode_simple=="BF") %>%
+        filter(timepoint=="M12")
+#150 208
+table(BF_M12$infant_ffq_feeding_mode_simple, useNA = "ifany")
+
+#mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg
+table1 <- table(NBF_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+table2 <- table(BF_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+prop_table2 <- prop.table(table(BF_M12$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+#mother_birthcard_parity_catg
+table1 <- table(NBF_M12$mother_birthcard_parity_catg, useNA = "ifany")
+table2 <- table(BF_M12$mother_birthcard_parity_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$mother_birthcard_parity_catg))*100
+prop_table2 <- prop.table(table(BF_M12$mother_birthcard_parity_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$mother_birthcard_parity_catg,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#birth_deliverybirthcard_mode_binary
+table1 <- table(NBF_M12$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+table2 <- table(BF_M12$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$birth_deliverybirthcard_mode_binary))*100
+prop_table2 <- prop.table(table(BF_M12$birth_deliverybirthcard_mode_binary))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$birth_deliverybirthcard_mode_binary,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#mother_education_p18
+table1 <- table(NBF_M12$mother_education_p18, useNA = "ifany")
+table2 <- table(BF_M12$mother_education_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$mother_education_p18))*100
+prop_table2 <- prop.table(table(BF_M12$mother_education_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$mother_education_p18,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+#mother_health_smoked_one_whole_year_p18
+table1 <- table(NBF_M12$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+table2 <- table(BF_M12$mother_health_smoked_one_whole_year_p18, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$mother_health_smoked_one_whole_year_p18))*100
+prop_table2 <- prop.table(table(BF_M12$mother_health_smoked_one_whole_year_p18))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$mother_health_smoked_one_whole_year_p18,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#infant_sex_misc
+table1 <- table(NBF_M12$infant_sex_misc, useNA = "ifany")
+table2 <- table(BF_M12$infant_sex_misc, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$infant_sex_misc))*100
+prop_table2 <- prop.table(table(BF_M12$infant_sex_misc))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$infant_sex_misc,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#mother_birthcardself_gestational_age_weeks_catg
+table1 <- table(NBF_M12$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+table2 <- table(BF_M12$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$mother_birthcardself_gestational_age_weeks_catg))*100
+prop_table2 <- prop.table(table(BF_M12$mother_birthcardself_gestational_age_weeks_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$mother_birthcardself_gestational_age_weeks_catg,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+
+#infant_growth_birth_weight_kg
+hist(masterfile_M12_subset$infant_growth_birth_weight_kg) #normal
+dev.off()
+
+mean(NBF_M12$infant_growth_birth_weight_kg, na.rm=T)
+sd(NBF_M12$infant_growth_birth_weight_kg, na.rm=T)
+
+mean(BF_M12$infant_growth_birth_weight_kg, na.rm=T)
+sd(BF_M12$infant_growth_birth_weight_kg, na.rm=T)
+
+# Perform t-test
+t.test(infant_growth_birth_weight_kg ~ infant_ffq_feeding_mode_simple, data = masterfile_M12_subset)
+
+#infant_ffq_pureed_fruit_veg_intro_age_months_catg
+table1 <- table(NBF_M12$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+table2 <- table(BF_M12$infant_ffq_pureed_fruit_veg_intro_age_months_catg, useNA = "ifany")
+
+prop_table1 <- prop.table(table(NBF_M12$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+prop_table2 <- prop.table(table(BF_M12$infant_ffq_pureed_fruit_veg_intro_age_months_catg))*100
+
+# Output contingency tables and proportions
+print("Contingency table and proportions for Not Breastfed (NBF):")
+print(table1)
+print(prop_table1)
+
+print("Contingency table and proportions for Breastfed (BF):")
+print(table2)
+print(prop_table2)
+
+# Perform chi-square test
+test <-  table(masterfile_M12_subset$infant_ffq_pureed_fruit_veg_intro_age_months_catg,
+               masterfile_M12_subset$infant_ffq_feeding_mode_simple) 
+chisq.test(test)
+fisher.test(test)
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M12_subset$infant_ffq_gday_item_sum_recal) #right skewed
+dev.off()
+
+summary(NBF_M12$infant_ffq_gday_item_sum_recal)
+summary(BF_M12$infant_ffq_gday_item_sum_recal)
+
+median(NBF_M12$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(NBF_M12$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+median(BF_M12$infant_ffq_gday_item_sum_recal, na.rm=T)
+IQR(BF_M12$infant_ffq_gday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M12_subset$infant_ffq_gday_item_sum_recal ~ masterfile_M12_subset$infant_ffq_feeding_mode_simple)
+test$p.value
+
+#infant_ffq_energy_kcalday_item_sum_recal
+hist(masterfile_M12_subset$infant_ffq_energy_kcalday_item_sum_recal) #right skewed
+dev.off()
+
+summary(NBF_M12$infant_ffq_energy_kcalday_item_sum_recal)
+summary(BF_M12$infant_ffq_energy_kcalday_item_sum_recal)
+
+median(NBF_M12$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(NBF_M12$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+median(BF_M12$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+IQR(BF_M12$infant_ffq_energy_kcalday_item_sum_recal, na.rm=T)
+
+# Perform t-test
+test <- wilcox.test(masterfile_M12_subset$infant_ffq_energy_kcalday_item_sum_recal ~ masterfile_M12_subset$infant_ffq_feeding_mode_simple)
+test$p.value
