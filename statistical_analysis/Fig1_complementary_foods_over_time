@@ -1,0 +1,637 @@
+###     SCRIPT: SUPPLEMENTARY FIGURES: 1-4
+###     AUTHOR(S): SIOBHAN BRUSHETT
+###     DESCRIPTION: GENERATION OF SUPPLEMENTARY FIGURES
+###     PROJECT: LL-NEXT: PHR
+###     LAST UPDATED: 29 APRIL 2024
+###     NOTE(S): 
+
+#libraries
+library(tidyverse)
+library(RColorBrewer)
+library(patchwork)
+library(ggtext)
+library(purrr)
+library(ggpubr)
+
+## Contents of this file
+
+## 0. LOAD FILE
+## 1. DATA WRANGLING: FOOD CRITERIA AND MUTATE FEEDING MODE 
+## 2. FIGURE 1A and 1B: MEDIAN INTAKE AND FOOD GROUP PROPORTIONS OVER TIME (G/DAY)
+## 3. FIGURE 1C and 1D: MEDIAN INTAKE AND FOOD GROUP PROPORTIONS OVER TIME (KCAL/DAY)
+
+        ##### =========================== 0. LOAD FILE =========================== #####
+#masterfile
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+#foods in kcal 
+food_groups_kcal  <- read.delim("infant_ffq_WUR_processed_cleaned_kcal_ONLY.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#1694  92
+
+feeding_mode <- masterfile %>% 
+        select(c(next_id_infant,
+                 timepoint,
+                 infant_ffq_feeding_mode_simple))
+food_groups_kcal <- left_join(food_groups_kcal, feeding_mode)
+#1694  93
+
+rm(feeding_mode)
+
+        ##### =========================== 1. DATA WRANGLING: MUTATE FEEDING MODE AND FOOD CRITERIA =========================== #####
+        ##### 1.1. MUTATE FEEDING MODE #####
+table(masterfile$infant_ffq_feeding_mode_simple[masterfile$timepoint=="M6"], useNA = "ifany")
+#BF  NBF <NA> 
+#421  382  220 
+
+table(masterfile$infant_ffq_feeding_mode_simple[masterfile$timepoint=="M9"], useNA = "ifany")
+# BF  NBF <NA> 
+#280  493  250 
+
+table(masterfile$infant_ffq_feeding_mode_simple[masterfile$timepoint=="M12"], useNA = "ifany")
+#BF  NBF <NA> 
+#150  548  325
+
+table(masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$timepoint=="M12"], useNA="ifany")
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="1,5"] <- "2"
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="10,5"] <- "11"
+masterfile$infant_ffq_breastfeeding_stopped_months[masterfile$infant_ffq_breastfeeding_stopped_months=="4,5"] <- "5"
+masterfile$infant_ffq_breastfeeding_stopped_months <- as.numeric(as.character(masterfile$infant_ffq_breastfeeding_stopped_months))
+
+        ##### 1.2. M6 #####
+infant_ffq_M6 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_breastfeeding_stopped_months,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M6") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple, infant_ffq_breastfeeding_stopped_months)))) == (ncol(.) - 4)) %>% #remove participants with all NAs after infant_ffq_breastfeeding_stopped_months
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#564  23
+
+        #criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M6 <- infant_ffq_M6 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#558 23
+
+        #criteria 2: remove food groups where less than 5% (27.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- infant_ffq_M6 %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_breastfeeding_stopped_months,
+        infant_ffq_gday_item_sum_recal))
+#558 19
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+(5*558)/100 #27.9
+
+#therefore remove dairy (n=10) and meat substitutes (n=9)
+infant_ffq_M6 <- infant_ffq_M6 %>% 
+        select(-c(dairy, meat_substitute)) #food groups with less than 5% (n=27.9) of participants indicating "yes", irrespective of feeding mode
+
+#558 20
+
+rm(criteria_2)
+
+str(infant_ffq_M6)
+
+        #update feeding mode
+table(infant_ffq_M6$infant_ffq_feeding_mode_simple, useNA = "ifany")
+#BF NBF 
+#318 240 
+
+table(infant_ffq_M6$infant_ffq_breastfeeding_stopped_months, useNA="ifany")
+#0    1    2    3    4    5    6    7    8    9   10   11   13 <NA> 
+#62   51   26   39   35   19   39   29   22   13   23   13  115   72 
+
+#if feeding_mode == NBF & stopped == 0 "never_BF", else "stopped_BF"
+infant_ffq_M6 <- infant_ffq_M6 %>% 
+        mutate(feeding_mode = ifelse(infant_ffq_feeding_mode_simple == "NBF" &
+                                             infant_ffq_breastfeeding_stopped_months==0, "never_BF",
+                                     ifelse(infant_ffq_feeding_mode_simple == "NBF" &
+                                                    infant_ffq_breastfeeding_stopped_months!=0, "stopped_BF", "BF"))) %>% 
+        mutate_if(is.character, as.factor)
+infant_ffq_M6$feeding_mode <- factor(infant_ffq_M6$feeding_mode, levels=c("never_BF", 
+                                                                          "stopped_BF",
+                                                                          "BF"))
+table(infant_ffq_M6$feeding_mode, useNA = "ifany")
+#never_BF  stopped_BF    BF 
+#62        178          318
+
+qc <- infant_ffq_M6 %>% 
+        select(c(infant_ffq_feeding_mode_simple,
+                 infant_ffq_breastfeeding_stopped_months,
+                 feeding_mode))
+rm(qc)
+
+        ##### 1.3. M9  #####
+infant_ffq_M9 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_breastfeeding_stopped_months,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M9") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple, infant_ffq_breastfeeding_stopped_months)))) == (ncol(.) - 4)) %>% #remove participants with all NAs after infant_ffq_breastfeeding_stopped_months
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#586  26
+
+        #criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M9 <- infant_ffq_M9 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#586 22
+
+        #criteria 2: remove food groups where less than 5% (27.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- infant_ffq_M9 %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_breastfeeding_stopped_months,
+        infant_ffq_gday_item_sum_recal))
+#586 21
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+(5*586)/100 #29.3
+
+#therefore remove savoury snacks (n=25)
+infant_ffq_M9 <- infant_ffq_M9 %>% 
+        select(-savoury_snacks) #food groups with less than 5% (n=29.3) of participants indicating "yes", irrespective of feeding mode
+
+#586 25
+
+rm(criteria_2)
+
+str(infant_ffq_M9)
+
+        #update feeding mode
+table(infant_ffq_M9$infant_ffq_feeding_mode_simple, useNA = "ifany")
+#BF NBF 
+#241 345 
+
+table(infant_ffq_M9$infant_ffq_breastfeeding_stopped_months, useNA="ifany")
+#0    1    2    3    4    5    6    7    8    9   10   11   13 <NA> 
+#63   49   33   39   34   19   42   35   27   14   22   12  121   76 
+
+#if feeding_mode == NBF & stopped == 0 "never_BF", else "stopped_BF"
+infant_ffq_M9 <- infant_ffq_M9 %>% 
+        mutate(feeding_mode = ifelse(infant_ffq_feeding_mode_simple == "NBF" &
+                                             infant_ffq_breastfeeding_stopped_months==0, "never_BF",
+                                     ifelse(infant_ffq_feeding_mode_simple == "NBF" &
+                                                    infant_ffq_breastfeeding_stopped_months!=0, "stopped_BF", "BF"))) %>% 
+        mutate_if(is.character, as.factor)
+infant_ffq_M9$feeding_mode <- factor(infant_ffq_M9$feeding_mode, levels=c("never_BF", 
+                                                                          "stopped_BF",
+                                                                          "BF"))
+table(infant_ffq_M9$feeding_mode, useNA = "ifany")
+#never_BF  stopped_BF    BF 
+#63        282          241
+
+qc <- infant_ffq_M9 %>% 
+        select(c(infant_ffq_feeding_mode_simple,
+                 infant_ffq_breastfeeding_stopped_months,
+                 feeding_mode))
+rm(qc)
+
+        ##### 1.4. M12 #####
+infant_ffq_M12 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_breastfeeding_stopped_months,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M12") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple, infant_ffq_breastfeeding_stopped_months)))) == (ncol(.) - 4)) %>% #remove participants with all NAs after infant_ffq_breastfeeding_stopped_months
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#478  26
+
+        #criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M12 <- infant_ffq_M12 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#478 26
+
+        #criteria 2: remove food groups where less than 5% (27.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- infant_ffq_M12 %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_breastfeeding_stopped_months,
+        infant_ffq_gday_item_sum_recal))
+#478 21
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+(5*478)/100 #23.9
+#no items were removed as they were all well above 23.9
+rm(criteria_2)
+
+str(infant_ffq_M12)
+
+        #update feeding mode
+table(infant_ffq_M12$infant_ffq_feeding_mode_simple, useNA = "ifany")
+#BF NBF 
+#150 328 
+
+table(infant_ffq_M12$infant_ffq_breastfeeding_stopped_months, useNA="ifany")
+#0    1    2    3    4    5    6    7    8    9   10   11   13 
+#49  36   21   32   26   18   37   29   19   18   29   14  150
+
+#if feeding_mode == NBF & stopped == 0 "never_BF", else "stopped_BF"
+infant_ffq_M12 <- infant_ffq_M12 %>% 
+        mutate(feeding_mode = ifelse(infant_ffq_feeding_mode_simple == "NBF" &
+                                             infant_ffq_breastfeeding_stopped_months==0, "never_BF",
+                                     ifelse(infant_ffq_feeding_mode_simple == "NBF" &
+                                                    infant_ffq_breastfeeding_stopped_months!=0, "stopped_BF", "BF"))) %>% 
+        mutate_if(is.character, as.factor)
+infant_ffq_M12$feeding_mode <- factor(infant_ffq_M12$feeding_mode, levels=c("never_BF", 
+                                                                          "stopped_BF",
+                                                                          "BF"))
+table(infant_ffq_M12$feeding_mode, useNA = "ifany")
+#never_BF  stopped_BF    BF 
+#49        279          150
+
+qc <- infant_ffq_M12 %>% 
+        select(c(infant_ffq_feeding_mode_simple,
+                 infant_ffq_breastfeeding_stopped_months,
+                 feeding_mode))
+rm(qc)
+
+        ##### 1.5. COMBINED DATAFRAME #####
+infant_ffq_all <- list(infant_ffq_M6, infant_ffq_M9, infant_ffq_M12)
+infant_ffq_all <- infant_ffq_all %>% reduce(full_join)
+#1622 27
+
+str(infant_ffq_all)
+infant_ffq_all <- infant_ffq_all %>% 
+        relocate(feeding_mode, .after = infant_ffq_feeding_mode_simple)
+infant_ffq_all$next_id_infant <- as.factor(as.character(infant_ffq_all$next_id_infant)) #741 unique ids 
+infant_ffq_all$timepoint <- as.factor(as.character(infant_ffq_all$timepoint))
+
+#rm(infant_ffq_M6, infant_ffq_M9, infant_ffq_M12)
+
+outcomes <- masterfile %>% filter(
+        timepoint=="M6" | timepoint=="M9" | timepoint=="M12") %>%
+        select(c(next_id_infant,
+                 timepoint,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_fm_score,
+                 infant_asq_gm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score))
+#3069 10
+
+infant_ffq_outcomes <- left_join(infant_ffq_all, outcomes) #Joining with `by = join_by(next_id_infant, timepoint)`
+str(infant_ffq_outcomes)
+#1622 35
+summary(infant_ffq_outcomes)
+table(infant_ffq_outcomes$infant_asq_total_score[infant_ffq_outcomes$timepoint=="M12"], useNA="ifany") #23 missings
+table(infant_ffq_outcomes$infant_growth_WLZ_imputed[infant_ffq_outcomes$timepoint=="M12"], useNA="ifany") #15 missings
+table(infant_ffq_outcomes$infant_growth_BMIz_imputed[infant_ffq_outcomes$timepoint=="M12"], useNA="ifany") #15 missings
+
+infant_ffq_outcomes$next_id_infant <- as.factor(as.character(infant_ffq_outcomes$next_id_infant)) #741 unique ids 
+infant_ffq_outcomes$timepoint <- factor(infant_ffq_outcomes$timepoint, levels = c("M6", "M9", "M12"))
+infant_ffq_outcomes$infant_ffq_feeding_mode_simple <- factor(infant_ffq_outcomes$infant_ffq_feeding_mode_simple, levels = c("NBF", "BF"))
+
+rm(infant_ffq_all, outcomes)
+
+##### =========================== 2. FIGURE S1A and S1B: MEDIAN INTAKE AND FOOD GROUP PROPORTIONS OVER TIME (G/DAY) =========================== #####
+
+food_groups <- infant_ffq_outcomes %>% select(c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        breads,
+        dairy,
+        eggs,
+        fats_and_oils,
+        fish,
+        fruits,
+        grain_products_and_rice,
+        legumes,
+        meat,
+        meat_substitute,
+        nuts,
+        pancake,
+        pasta,
+        pastry,
+        potatoes,
+        savoury_snacks,
+        sugar_sweets,
+        sweet_drinks,
+        tea,
+        vegetables,
+        water)) %>%
+        rename(grains=grain_products_and_rice,
+               meat_sub=meat_substitute,
+               snacks=savoury_snacks)
+
+str(food_groups)
+#1622 24
+summary(food_groups)    
+
+        #investigate median intake of food groups overall - line plot
+food_groups_reformat <- food_groups %>%
+        pivot_longer(cols = -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple), names_to = "food_group_value") %>%
+        mutate(food_group = str_extract(food_group_value, "breads|dairy|eggs|fats_and_oils|fish|fruits|grains|legumes|meat_sub|meat|nuts|pancake|pasta|pastry|potatoes|snacks|sugar_sweets|sweet_drinks|tea|vegetables|water")) %>%
+        group_by(timepoint, food_group) %>%
+        summarise(median = median(value, na.rm = TRUE)) %>%
+        na.omit() #some products are not applicable at M6
+#57  3
+food_groups_reformat$food_group <- factor(food_groups_reformat$food_group, levels = c("meat_sub", "dairy", "sugar_sweets", "snacks", "fish", "nuts", 
+                                                                                      "fats_and_oils", "meat", "eggs", "sweet_drinks", "legumes", 
+                                                                                      "pasta", "pancake", "tea", "grains", "breads", 
+                                                                                      "pastry", "water", "potatoes", "vegetables", "fruits"))
+food_groups_reformat$timepoint <- factor(food_groups_reformat$timepoint, levels=c("M6", "M9", "M12"))
+
+        #investigate proportion median intake of food groups overall - stacked bar plot
+food_groups_overall <- food_groups %>%
+        pivot_longer(cols = -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple), names_to = "food_group") %>%
+        rename(feeding_mode=infant_ffq_feeding_mode_simple) %>%
+        na.omit() #some products are not applicable at M6
+#30686 5 
+
+food_groups_overall$food_group <- factor(food_groups_overall$food_group, levels = c("meat_sub", "dairy", "sugar_sweets", "snacks", "fish", "nuts", 
+                                                                                    "fats_and_oils", "meat", "eggs", "sweet_drinks", "legumes", 
+                                                                                    "pasta", "pancake", "tea", "grains", "breads", 
+                                                                                    "pastry", "water", "potatoes", "vegetables", "fruits"))
+food_groups_overall$timepoint <- factor(food_groups_overall$timepoint, levels=c("M6", "M9", "M12"))
+
+custom_palette = c("#1F77B4", "#FF7F0E", "#D62728", "#9467BD", "#8C564B",
+                   "#E377C2", "#7F7F7F", "#000000", "#17BECF", "#AEC7E8",
+                   "#FA8072", "#FF9896", "#C5B0D5", "#C49C94", "#F7B6D2",
+                   "#C7C7C7", "#008080", "#FFD92F", "#FFBB78", "#94618E",
+                   "#66C2A5")
+
+pdf(file = "4_food_groups_over_time_median_overall_updated.pdf", width = 16, height = 12, useDingbats = F, onefile = T)
+
+#food group median intake over time
+food_median_gday <- ggplot(food_groups_reformat, aes(x = timepoint, y = median, group = food_group, shape = food_group)) +
+        geom_line(aes(color = food_group), linewidth = 1.8) +
+        geom_point(aes(color = food_group), size = 4, shape = 19) +
+        labs(y = "Median intake (g/day)", x = "") +
+        scale_y_continuous(labels = scales::unit_format(scale = 1, unit = ""),  # Set 20 unit intervals in the y-axis text
+                           breaks = seq(0, 150, by = 20),  # Set 20 unit intervals from 0 to 140
+                           limits = c(0, 150)) +  # Set the maximum value for the y-axis to 140
+        theme_bw() +
+        theme(
+                plot.title = element_text(color = "black", size = 22, face = "bold"),  # Increase the font size here
+                axis.text.x = element_blank(),  # Remove x-axis text
+                axis.ticks.x = element_blank(),  # Remove x-axis ticks
+                axis.title.y = element_text(size = 20),
+                axis.text.y = element_text(color = "black", size = 16),
+                legend.text = element_text(size = 16),
+                legend.position = "none") +  # Remove legend
+        scale_color_manual(values = custom_palette)  # Use scale_color_manual to set custom colors
+
+
+#food group proportions over time
+food_prop_gday <- ggplot() 
+food_prop_gday <- food_prop_gday + geom_bar(data = food_groups_overall, 
+                                  aes(x=timepoint, y=value, fill=food_group), position="fill",stat="identity")
+food_prop_gday <- food_prop_gday + 
+        #ggtitle("Proportion of food group intake (g/day) at 6, 9 and 12 months of age") +
+        theme_bw() +
+        theme(
+                plot.title = element_text(color = "black", size = 22, face = "bold"),  # Increase the font size here
+                axis.text.x = element_blank(),  # Remove x-axis text
+                axis.ticks.x = element_blank(),  # Remove x-axis ticks
+                axis.title.y = element_text(size = 20),
+                axis.text.y = element_text(color = "black", size = 16),
+                legend.text = element_text(size = 16)) + 
+        scale_fill_manual(values = custom_palette) +
+        theme(legend.title = element_blank()) +
+        labs (y="Proportion intake (%)",x="") +
+        scale_y_continuous(labels = scales::percent) 
+
+##NOTE!! generate and save with plot layout of kcal/day before dev.off()
+
+##### =========================== 3. FIGURE S1C and S1D: MEDIAN INTAKE AND FOOD GROUP PROPORTIONS OVER TIME (KCAL/DAY) =========================== #####
+#M6
+infant_ffq_M6_kcal <- food_groups_kcal %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_energy_kcalday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M6") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_kcal"), ends_with("kcal")) 
+#605  22
+
+#complement dataset with gday dataset by subsetting by next_id_infant
+infant_ffq_M6_kcal <- infant_ffq_M6_kcal %>% 
+        filter(next_id_infant %in% infant_ffq_M6$next_id_infant)
+#558 22
+
+        #criteria 2: remove food groups where less than 5% (27.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+        #based on g/day we know that we must dairy (n=10) and meat substitutes (n=9)
+infant_ffq_M6_kcal <- infant_ffq_M6_kcal %>% 
+        select(-c(dairy, meat_substitute)) #food groups with less than 5% (n=27.9) of participants indicating "yes", irrespective of feeding mode
+
+#558 20
+
+        #M9
+infant_ffq_M9_kcal <- food_groups_kcal %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_energy_kcalday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M9") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_kcal"), ends_with("kcal")) 
+#611  25
+
+#complement dataset with gday dataset by subsetting by next_id_infant
+infant_ffq_M9_kcal <- infant_ffq_M9_kcal %>% 
+        filter(next_id_infant %in% infant_ffq_M9$next_id_infant)
+#586 25
+
+#criteria 2: remove food groups where less than 5% (29.3) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+#we know from gday section that savoury snack (n=25) can be removed
+
+infant_ffq_M9_kcal <- infant_ffq_M9_kcal %>% 
+        select(-savoury_snacks) #food groups with less than 5% (n=29.3) of participants indicating "yes", irrespective of feeding mode
+
+#586 24
+
+        #M12
+infant_ffq_M12_kcal <- food_groups_kcal %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_energy_kcalday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M12") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_kcal"), ends_with("kcal")) 
+#478  25
+
+#complement dataset with gday dataset by subsetting by next_id_infant
+infant_ffq_M12_kcal <- infant_ffq_M12_kcal %>% 
+        filter(next_id_infant %in% infant_ffq_M12$next_id_infant)
+#478 25
+colnames(infant_ffq_M12_kcal)
+
+#criteria 2: remove food groups where less than 5% (23.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+#based on gday section, no items were removed as they were all well above 23.9
+rm(infant_ffq_M6, infant_ffq_M9, infant_ffq_M12)
+
+infant_ffq_kcal <- list(infant_ffq_M6_kcal, infant_ffq_M9_kcal, infant_ffq_M12_kcal)
+infant_ffq_kcal <- infant_ffq_kcal %>% reduce(full_join)
+#1622 25
+
+str(infant_ffq_kcal)
+infant_ffq_kcal$next_id_infant <- as.factor(as.character(infant_ffq_kcal$next_id_infant)) #741 unique ids 
+infant_ffq_kcal$timepoint <- as.factor(as.character(infant_ffq_kcal$timepoint)) #3 time points
+
+food_groups <- infant_ffq_kcal %>% select(c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        breads,
+        dairy,
+        eggs,
+        fats_and_oils,
+        fish,
+        fruits,
+        grain_products_and_rice,
+        legumes,
+        meat,
+        meat_substitute,
+        nuts,
+        pancake,
+        pasta,
+        pastry,
+        potatoes,
+        savoury_snacks,
+        sugar_sweets,
+        sweet_drinks,
+        tea,
+        vegetables,
+        water)) %>%
+        rename(grains=grain_products_and_rice,
+               meat_sub=meat_substitute,
+               snacks=savoury_snacks)
+
+str(food_groups)
+#1622 24
+summary(food_groups)    
+
+#investigate food groups overall - line plot
+food_groups_reformat <- food_groups %>%
+        pivot_longer(cols = -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple), names_to = "food_group_value") %>%
+        mutate(food_group = str_extract(food_group_value, "breads|dairy|eggs|fats_and_oils|fish|fruits|grains|legumes|meat_sub|meat|nuts|pancake|pasta|pastry|potatoes|snacks|sugar_sweets|sweet_drinks|tea|vegetables|water")) %>%
+        group_by(timepoint, food_group) %>%
+        summarise(median = median(value, na.rm = TRUE)) %>%
+        na.omit() #some products are not applicable at M6
+#57  3
+
+food_groups_reformat$food_group <- factor(food_groups_reformat$food_group, levels = c("meat_sub", "dairy", "sugar_sweets", "snacks", "fish", "nuts", 
+                                                                                      "fats_and_oils", "meat", "eggs", "sweet_drinks", "legumes", 
+                                                                                      "pasta", "pancake", "tea", "grains", "breads", 
+                                                                                      "pastry", "water", "potatoes", "vegetables", "fruits"))
+food_groups_reformat$timepoint <- factor(food_groups_reformat$timepoint, levels=c("M6", "M9", "M12"))
+
+#investigate food group overall - stacked bar plot
+food_groups_overall <- food_groups %>%
+        pivot_longer(cols = -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple), names_to = "food_group") %>%
+        rename(feeding_mode=infant_ffq_feeding_mode_simple) %>%
+        na.omit() #some products are not applicable at M6
+#30686  5
+
+food_groups_overall$food_group <- factor(food_groups_overall$food_group, levels = c("meat_sub", "dairy", "sugar_sweets", "snacks", "fish", "nuts", 
+                                                                                    "fats_and_oils", "meat", "eggs", "sweet_drinks", "legumes", 
+                                                                                    "pasta", "pancake", "tea", "grains", "breads", 
+                                                                                    "pastry", "water", "potatoes", "vegetables", "fruits"))
+food_groups_overall$timepoint <- factor(food_groups_overall$timepoint, levels=c("M6", "M9", "M12"))
+
+custom_palette = c("#1F77B4", "#FF7F0E", "#D62728", "#9467BD", "#8C564B",
+                   "#E377C2", "#7F7F7F", "#000000", "#17BECF", "#AEC7E8",
+                   "#FA8072", "#FF9896", "#C5B0D5", "#C49C94", "#F7B6D2",
+                   "#C7C7C7", "#008080", "#FFD92F", "#FFBB78", "#94618E",
+                   "#66C2A5")
+
+#food group median intake over time
+food_median_kday <- ggplot(food_groups_reformat, aes(x = timepoint, y = median, group = food_group, shape = food_group)) +
+        geom_line(aes(color = food_group), linewidth = 1.8) +
+        geom_point(aes(color = food_group), size = 4, shape = 19) +
+        labs(y = "Median intake (kcal/day)", x = "") +
+        scale_y_continuous(labels = scales::unit_format(scale = 1, unit = ""),  # Set 20 unit intervals in the y-axis text
+                           breaks = seq(0, 200, by = 20),  # Set 20 unit intervals from 0 to 140
+                           limits = c(0, 200)) +  # Set the maximum value for the y-axis to 140
+        theme_bw() +
+        theme(
+                plot.title = element_text(color = "black", size = 22, face = "bold"),  # Increase the font size here
+                axis.text.x = element_text(color = "black", size = 16),
+                axis.text.y = element_text(color = "black", size = 16),
+                axis.title.y = element_text(size = 20),
+                legend.text = element_text(size = 16),
+                legend.position = "none" ) +
+        scale_color_manual(values = custom_palette) +  # Use scale_color_manual to set custom colors
+        theme(legend.title = element_blank()) +
+        scale_x_discrete(labels=c('M6' = 'M6\nn=558', 'M9' = 'M9\nn=586', 'M12' = 'M12\nn=478')) 
+
+
+#food group proportions over time
+food_prop_kday <- ggplot() 
+food_prop_kday <- food_prop_kday + geom_bar(data = food_groups_overall, 
+                                  aes(x=timepoint, y=value, fill=food_group), position="fill",stat="identity")
+food_prop_kday <- food_prop_kday + 
+        #ggtitle("Proportion of food group intake (g/day) at 6, 9 and 12 months of age") +
+        theme_bw() +
+        theme(
+                plot.title = element_text(color = "black", size = 22, face = "bold"),  # Increase the font size here
+                axis.text.x = element_text(color = "black", size = 16),
+                axis.text.y = element_text(color = "black", size = 16),
+                axis.title.y = element_text(size = 20),
+                legend.text = element_text(size = 16)) + 
+        scale_fill_manual(values = custom_palette) +
+        theme(legend.title = element_blank()) +
+        labs (y="Proportion intake (%)",x="") +
+        scale_y_continuous(labels = scales::percent) +
+        scale_x_discrete(labels=c('M6' = 'M6\nn=558', 'M9' = 'M9\nn=586', 'M12' = 'M12\nn=478')) 
+
+food_groups_plot <- food_median_gday + food_prop_gday + food_median_kday + food_prop_kday + plot_layout(ncol=2)
+print(food_groups_plot)
+dev.off()
+
