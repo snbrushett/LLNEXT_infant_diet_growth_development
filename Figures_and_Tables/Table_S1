@@ -1,0 +1,2064 @@
+###     SCRIPT: PARTICIPATION EXLUSION ANALYSIS
+###     AUTHOR(S): SIOBHAN BRUSHETT
+###     DESCRIPTION: DESCRIPTIVE STATISTICS OF EXCLUSED VS INCLUDED INFANTS
+###     PROJECT: LL-NEXT: PHR
+###     LAST UPDATED: 23 JUNE 2024
+###     NOTE(S): 
+
+#libraries
+library(tidyverse)
+
+## 0. LOAD FILE
+## 1. TIME POINTS COMBINATIONS AND GDAY vs KDAY COMPARISONS
+## 2. COMPARISON OF TOTAL WITH INFANTS INCLUDED IN DIETARY PATTERNS
+## 3. COMPARISON OF TOTAL WITH INFANTS INCLUDED IN REGRESSIONS
+
+        ##### =========================== 0. LOAD FILE =========================== #####
+#masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+#relative proportions: gday
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/dietary_reduction_techniques/relative_proportions/gday/")
+rel_gday_M6 <- read.delim("infant_ffq_M6_rel_prop.txt", sep = "\t", header = TRUE, stringsAsFactors = T) #558
+rel_gday_M9 <- read.delim("infant_ffq_M9_rel_prop_updated.txt", sep = "\t", header = TRUE, stringsAsFactors = T) #586
+rel_gday_M12 <- read.delim("infant_ffq_M12_rel_prop.txt", sep = "\t", header = TRUE, stringsAsFactors = T) #478
+
+#relative proportions: kday
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/dietary_reduction_techniques/relative_proportions/kcal")
+rel_kday_M6 <- read.delim("infant_ffq_M6_rel_prop_kcal.txt", sep = "\t", header = TRUE, stringsAsFactors = T) #554
+rel_kday_M9 <- read.delim("infant_ffq_M9_rel_prop_kcal.txt", sep = "\t", header = TRUE, stringsAsFactors = T) #586
+rel_kday_M12 <- read.delim("infant_ffq_M12_rel_prop_kcal.txt", sep = "\t", header = TRUE, stringsAsFactors = T) #478
+
+#calories masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/infant_FFQs/files_processed_WUR/")
+food_groups_kcal  <- read.delim("infant_ffq_WUR_processed_cleaned_kcal_ONLY.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#1694  92
+
+#dietary clusters
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/latent_profile_analysis/RE_ Results LPA/")
+dietary_clusters <- read.delim("infant_LPA_dietary_clusters_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#1622 8
+
+#merge all
+masterfile <- full_join(masterfile, dietary_clusters)
+#10230 202
+rm(dietary_clusters)
+
+        ##### =========================== 1. TIME POINTS COMBINATIONS AND GDAY vs KDAY COMPARISONS =========================== #####
+
+        #combinations: gday
+rel_gday_M6 <- rel_gday_M6 %>% 
+        mutate(rel_gday_M6 = 1) %>%
+        select(c(next_id_infant,
+                 rel_gday_M6))
+
+rel_gday_M9 <- rel_gday_M9 %>% 
+        mutate(rel_gday_M9 = 1) %>%
+        select(c(next_id_infant,
+                 rel_gday_M9))
+
+rel_gday_M12 <- rel_gday_M12 %>% 
+        mutate(rel_gday_M12 = 1) %>%
+        select(c(next_id_infant,
+                 rel_gday_M12))
+
+rel_gday_all <- list(rel_gday_M6, rel_gday_M9, rel_gday_M12)
+
+#merge all data frames in list
+rel_gday_all <- rel_gday_all %>% reduce(full_join) #741 64
+
+rel_gday_all <- rel_gday_all %>% 
+        mutate(across(everything(), ~replace_na(.x, 0))) %>%
+        mutate(combinations = paste(rel_gday_M6, rel_gday_M9, rel_gday_M12, sep="-"))
+
+result_gday <- rel_gday_all %>%
+        count(combinations, name = "frequency") %>%
+        mutate(cumulative_frequency = cumsum(frequency),
+               percentage = (frequency / sum(frequency)) * 100,
+               cumulative_percentage = cumsum(percentage))
+
+        #combinations: kday
+rel_kday_M6 <- rel_kday_M6 %>% 
+        mutate(rel_kday_M6 = 1) %>%
+        select(c(next_id_infant,
+                 rel_kday_M6))
+
+rel_kday_M9 <- rel_kday_M9 %>% 
+        mutate(rel_kday_M9 = 1) %>%
+        select(c(next_id_infant,
+                 rel_kday_M9))
+
+rel_kday_M12 <- rel_kday_M12 %>% 
+        mutate(rel_kday_M12 = 1) %>%
+        select(c(next_id_infant,
+                 rel_kday_M12))
+
+rel_kday_all <- list(rel_kday_M6, rel_kday_M9, rel_kday_M12)
+
+#merge all data frames in list
+rel_kday_all <- rel_kday_all %>% reduce(full_join) #740 64
+
+rel_kday_all <- rel_kday_all %>% 
+        mutate(across(everything(), ~replace_na(.x, 0))) %>%
+        mutate(combinations = paste(rel_kday_M6, rel_kday_M9, rel_kday_M12, sep="-"))
+
+result_kday <- rel_kday_all %>%
+        count(combinations, name = "frequency") %>%
+        mutate(cumulative_frequency = cumsum(frequency),
+               percentage = (frequency / sum(frequency)) * 100,
+               cumulative_percentage = cumsum(percentage))
+
+rm(result_gday, result_kday)
+        
+        #gday vs kday
+#check combination: 0-1-1
+rel_gday_all_011 <- rel_gday_all %>% 
+        filter(combinations=="0-1-1") #58
+
+rel_kday_all_011 <- rel_kday_all %>% 
+        filter(combinations=="0-1-1") #61
+
+#find ids that are in gday but not in kday
+ids_only_in_gday <- setdiff(rel_gday_all_011$next_id_infant, rel_kday_all_011$next_id_infant)
+#character(0)
+
+#find ids that are in kday but not in gday
+ids_only_in_kday <- setdiff(rel_kday_all_011$next_id_infant, rel_gday_all_011$next_id_infant)
+#LLNEXT001964
+#LLNEXT200463
+#LLNEXT202332
+
+different_gday <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint=="M6") %>%
+        filter(next_id_infant=="LLNEXT001964" |
+                       next_id_infant=="LLNEXT200463" |
+                       next_id_infant=="LLNEXT202332" )
+#3 25
+
+different_kcal <- food_groups_kcal %>%
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_energy_kcalday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint=="M6") %>%
+        filter(next_id_infant=="LLNEXT001964" |
+                       next_id_infant=="LLNEXT200463" |
+                       next_id_infant=="LLNEXT202332" )
+#3 24
+
+#for these infants at 6 months, they only consumed water, thus there was a value at 6 months for gday, but not kcal.
+#this resulted in the combination 1-1-1 having '3 more' infants for gday than kday
+#in parallel this resulted in the combination 0-1-1 having '3 less' infants for gday than kday
+
+rm(rel_gday_all_011, rel_kday_all_011, different_gday, different_kcal)
+
+        #check combination: 1-0-0
+rel_gday_all_100 <- rel_gday_all %>% 
+        filter(combinations=="1-0-0") #59
+
+rel_kday_all_100 <- rel_kday_all %>% 
+        filter(combinations=="1-0-0") #58
+
+#find ids that are in gday but not in kday
+ids_only_in_gday <- setdiff(rel_gday_all_100$next_id_infant, rel_kday_all_100$next_id_infant)
+#LLNEXT304062
+
+#find ids that are in kday but not in gday
+ids_only_in_kday <- setdiff(rel_kday_all_100$next_id_infant, rel_gday_all_100$next_id_infant)
+#character(0)
+
+different_gday <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint=="M6") %>%
+        filter(next_id_infant=="LLNEXT304062")
+#1 25
+
+different_kcal <- food_groups_kcal %>%
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_energy_kcalday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint=="M6") %>%
+        filter(next_id_infant=="LLNEXT304062" )
+#1 24
+
+#again, the difference in combination is due to water, resulting in an 'additional' infant at 6 months for gday than kcal
+#moreover, sinces infants without any values are not part of the study, this infant (LLNEXT304062) having no kcal at any time point, results in the total number
+#of infants being 1 less for kday than gday
+
+rm(different_gday, different_kcal, rel_gday_all_100, rel_kday_all_100, food_groups_kcal,
+   rel_gday_M6, rel_gday_M9, rel_gday_M12, rel_gday_all,
+   rel_kday_M6, rel_kday_M9, rel_kday_M12, rel_kday_all)
+
+        ##### =========================== 2. COMPARISON OF TOTAL WITH INFANTS INCLUDED IN DIETARY PATTERNS =========================== #####
+        ##### 2.1 General #####
+#reformat parity
+hist(masterfile$mother_birthcard_parity[masterfile$timepoint=="M12"])
+masterfile <- masterfile %>% 
+        mutate(mother_birthcard_parity_catg = ifelse (mother_birthcard_parity==1, "primiparous", "multiparous")) %>%
+        mutate_if(is.character, as.factor)
+masterfile$mother_birthcard_parity_catg <- factor(masterfile$mother_birthcard_parity_catg, levels = c("primiparous", "multiparous"))
+table(masterfile$mother_birthcard_parity_catg[masterfile$timepoint=="M12"])
+
+
+#reformat gestational age
+hist(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"])
+dev.off()
+table(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"], useNA="ifany")
+
+masterfile <- masterfile %>% 
+        mutate(mother_birthcardself_gestational_age_weeks_catg = ifelse(mother_birthcardself_gestational_age_weeks <36.9, "pre_term",
+                                                                        ifelse(mother_birthcardself_gestational_age_weeks >= 36.9, "term", NA))) %>%
+        mutate_if(is.character, as.factor)
+
+table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#pre_term     term     <NA> 
+#530     7620     2080 
+
+        #demographics
+demog <- masterfile %>%
+        select(c(next_id_infant,
+                 timepoint,
+                 #maternal characteristics
+                 mother_birthcard_parity_catg,
+                 birth_deliverybirthcard_mode_binary,
+                 mother_education_p18,
+                 #infant characteristics
+                 infant_sex_misc,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_growth_birth_weight_kg_imputed))
+
+demog_M6 <- demog %>% 
+        filter(timepoint=="M6")
+
+demog_M9 <- demog %>% 
+        filter(timepoint=="M9")
+
+demog_M12 <- demog %>% 
+        filter(timepoint=="M12")
+
+        ##### 2.2 M6 FFQ selection #####
+M6_ffq_sel <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M6") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#564  22
+
+#criteria 1: filter for infants consuming >0 g./day
+M6_ffq_sel <- M6_ffq_sel %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#558 22
+
+#criteria 2: remove food groups where less than 5% (27.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- M6_ffq_sel %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_gday_item_sum_recal))
+#558 18
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+(5*558)/100 #27.9
+
+#therefore remove dairy (n=10) and meat substitutes (n=9)
+M6_ffq_sel <- M6_ffq_sel %>% 
+        select(-c(dairy, meat_substitute)) #food groups with less than 5% (n=27.9) of participants indicating "yes", irrespective of feeding mode
+
+#558 20
+M6_ffq_sel <- M6_ffq_sel %>% 
+        mutate(M6_ffq_sel=1) %>%
+        select(c(next_id_infant,
+                 M6_ffq_sel))
+
+M6_ffq_sel <- left_join(M6_ffq_sel, demog_M6)
+
+#subset masterfile based on ids that are not in selection
+masterfile_M6 <- masterfile %>% 
+        filter(timepoint=="M6")
+#1023 201
+masterfile_M6$timepoint <- as.factor(as.character(masterfile_M6$timepoint))
+
+#filter out participants with NA values in all columns after 'timepoint'
+masterfile_M6_subset <- masterfile_M6 %>%
+        filter(!apply(select(., (which(names(.) == "timepoint") + 1):ncol(.)), 1, function(x) all(is.na(x))))
+#1017 203
+
+M6_ffq_not_sel <- masterfile_M6_subset %>%
+        filter(!(next_id_infant %in% M6_ffq_sel$next_id_infant))
+#459 203 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M6_ffq_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_ffq_sel$mother_birthcard_parity_catg))*100
+
+table(M6_ffq_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_ffq_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M6_ffq_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M6_ffq_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M6_ffq_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_ffq_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M6_ffq_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_ffq_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M6_ffq_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M6_ffq_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+#mother_education_p18
+table(M6_ffq_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_ffq_sel$mother_education_p18))*100
+
+table(M6_ffq_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_ffq_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M6_ffq_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M6_ffq_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant characteristics
+#infant_sex_misc
+table(M6_ffq_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_ffq_sel$infant_sex_misc))*100
+
+table(M6_ffq_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_ffq_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M6_ffq_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M6_ffq_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M6_ffq_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_ffq_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M6_ffq_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_ffq_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M6_ffq_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M6_ffq_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M6_ffq_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M6_ffq_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M6_ffq_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M6_ffq_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M6_ffq_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_ffq_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M6_ffq_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_ffq_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M6_ffq_sel$infant_growth_birth_weight_kg_imputed, M6_ffq_not_sel$infant_growth_birth_weight_kg_imputed)
+
+
+        ##### 2.3 M9 FFQ selection #####
+M9_ffq_sel <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M9") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#586  25
+
+#criteria 1: filter for infants consuming >0 g./day
+M9_ffq_sel <- M9_ffq_sel %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#586 25
+
+#criteria 2: remove food groups where less than 5% (29.3) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- M9_ffq_sel %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_gday_item_sum_recal))
+#586 21
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+(5*586)/100 #29.3
+
+#therefore remove savoury snacks (n=25)
+M9_ffq_sel <- M9_ffq_sel %>% 
+        select(-savoury_snacks) #food groups with less than 5% (n=29.3) of participants indicating "yes", irrespective of feeding mode
+
+#586 24
+M9_ffq_sel <- M9_ffq_sel %>% 
+        mutate(M9_ffq_sel=1) %>%
+        select(c(next_id_infant,
+                 M9_ffq_sel))
+        
+M9_ffq_sel <- left_join(M9_ffq_sel, demog_M9)
+#586 9
+
+#subset masterfile based on ids that are not in selection
+masterfile_M9 <- masterfile %>% 
+        filter(timepoint=="M9")
+#1023 204
+masterfile_M9$timepoint <- as.factor(as.character(masterfile_M9$timepoint))
+
+#filter out participants with NA values in all columns after 'timepoint'
+masterfile_M9_subset <- masterfile_M9 %>%
+        filter(!apply(select(., (which(names(.) == "timepoint") + 1):ncol(.)), 1, function(x) all(is.na(x))))
+#1017 204
+
+M9_ffq_not_sel <- masterfile_M9_subset %>%
+        filter(!(next_id_infant %in% M9_ffq_sel$next_id_infant))
+#431 203 
+
+#maternal characteristics
+        #mother_birthcard_parity_catg
+table(M9_ffq_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M9_ffq_sel$mother_birthcard_parity_catg))*100
+
+table(M9_ffq_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M9_ffq_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M9_ffq_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M9_ffq_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M9_ffq_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M9_ffq_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M9_ffq_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M9_ffq_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M9_ffq_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M9_ffq_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M9_ffq_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M9_ffq_sel$mother_education_p18))*100
+
+table(M9_ffq_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M9_ffq_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M9_ffq_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M9_ffq_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+fisher.test(contingency_table)
+
+#infant characteristics
+        #infant_sex_misc
+table(M9_ffq_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M9_ffq_sel$infant_sex_misc))*100
+
+table(M9_ffq_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M9_ffq_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M9_ffq_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M9_ffq_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M9_ffq_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M9_ffq_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M9_ffq_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M9_ffq_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M9_ffq_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M9_ffq_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M9_ffq_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M9_ffq_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M9_ffq_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M9_ffq_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M9_ffq_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M9_ffq_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M9_ffq_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M9_ffq_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M9_ffq_sel$infant_growth_birth_weight_kg_imputed, M9_ffq_not_sel$infant_growth_birth_weight_kg_imputed)
+
+
+        ##### 2.4 M12 FFQ selection #####
+M12_ffq_sel <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M12") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#478  22
+
+#criteria 1: filter for infants consuming >0 g./day
+M12_ffq_sel <- M12_ffq_sel %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#478 25
+
+#criteria 2: remove food groups where less than 5% (23.9) of participants indicated 'yes' to consuming the food group, irrespective of feeding mode
+criteria_2 <- M12_ffq_sel %>% select(-c(
+        next_id_infant,
+        timepoint,
+        infant_ffq_feeding_mode_simple,
+        infant_ffq_gday_item_sum_recal))
+#478 18
+summary(criteria_2)
+
+criteria_2 <- criteria_2 %>%
+        mutate(across(everything(), ~ ifelse(. > 0, "yes", "no"))) %>%
+        mutate_if(is.character, as.factor)
+summary(criteria_2)
+
+(5*478)/100 #23.9
+#no items were removed as they were all well above 23.9
+rm(criteria_2)
+
+M12_ffq_sel <- M12_ffq_sel %>% 
+        mutate(M12_ffq_sel=1) %>%
+        select(c(next_id_infant,
+                 M12_ffq_sel))
+
+M12_ffq_sel <- left_join(M12_ffq_sel, demog_M12)
+#478 9
+
+#subset masterfile based on ids that are not in selection
+masterfile_M12 <- masterfile %>% 
+        filter(timepoint=="M12")
+#1023 204
+masterfile_M12$timepoint <- as.factor(as.character(masterfile_M12$timepoint))
+
+#filter out participants with NA values in all columns after 'timepoint'
+masterfile_M12_subset <- masterfile_M12 %>%
+        filter(!apply(select(., (which(names(.) == "timepoint") + 1):ncol(.)), 1, function(x) all(is.na(x))))
+#1017 204
+
+M12_ffq_not_sel <- masterfile_M12_subset %>%
+        filter(!(next_id_infant %in% M12_ffq_sel$next_id_infant))
+#539 204
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M12_ffq_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M12_ffq_sel$mother_birthcard_parity_catg))*100
+
+table(M12_ffq_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M12_ffq_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M12_ffq_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M12_ffq_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M12_ffq_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M12_ffq_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M12_ffq_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M12_ffq_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M12_ffq_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M12_ffq_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M12_ffq_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M12_ffq_sel$mother_education_p18))*100
+
+table(M12_ffq_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M12_ffq_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M12_ffq_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M12_ffq_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant characteristics
+        #infant_sex_misc
+table(M12_ffq_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M12_ffq_sel$infant_sex_misc))*100
+
+table(M12_ffq_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M12_ffq_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M12_ffq_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M12_ffq_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+#mother_birthcardself_gestational_age_weeks_catg
+table(M12_ffq_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M12_ffq_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M12_ffq_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M12_ffq_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M12_ffq_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M12_ffq_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M12_ffq_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M12_ffq_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M12_ffq_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M12_ffq_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M12_ffq_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M12_ffq_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M12_ffq_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M12_ffq_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M12_ffq_sel$infant_growth_birth_weight_kg_imputed, M12_ffq_not_sel$infant_growth_birth_weight_kg_imputed)
+rm(list=ls())
+
+        ##### =========================== 3. COMPARISON OF TOTAL WITH INFANTS INCLUDED IN REGRESSIONS =========================== #####
+        ##### 3.1 Reload files and General #####
+#masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+#dietary clusters
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/latent_profile_analysis/RE_ Results LPA/")
+dietary_clusters <- read.delim("infant_LPA_dietary_clusters_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#1622 8
+
+#merge all
+masterfile <- full_join(masterfile, dietary_clusters)
+#10230 202
+rm(dietary_clusters)
+
+#reformat parity
+hist(masterfile$mother_birthcard_parity[masterfile$timepoint=="M12"])
+masterfile <- masterfile %>% 
+        mutate(mother_birthcard_parity_catg = ifelse (mother_birthcard_parity==1, "primiparous", "multiparous")) %>%
+        mutate_if(is.character, as.factor)
+masterfile$mother_birthcard_parity_catg <- factor(masterfile$mother_birthcard_parity_catg, levels = c("primiparous", "multiparous"))
+table(masterfile$mother_birthcard_parity_catg[masterfile$timepoint=="M12"])
+
+
+#reformat gestational age
+hist(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"])
+dev.off()
+table(masterfile$mother_birthcardself_gestational_age_weeks[masterfile$timepoint=="M12"], useNA="ifany")
+
+masterfile <- masterfile %>% 
+        mutate(mother_birthcardself_gestational_age_weeks_catg = ifelse(mother_birthcardself_gestational_age_weeks <36.9, "pre_term",
+                                                                        ifelse(mother_birthcardself_gestational_age_weeks >= 36.9, "term", NA))) %>%
+        mutate_if(is.character, as.factor)
+
+table(masterfile$mother_birthcardself_gestational_age_weeks_catg, useNA="ifany")
+#pre_term     term     <NA> 
+#530     7620     2080 
+
+#demographics
+demog <- masterfile %>%
+        select(c(next_id_infant,
+                 timepoint,
+                 #maternal characteristics
+                 mother_birthcard_parity_catg,
+                 birth_deliverybirthcard_mode_binary,
+                 mother_education_p18,
+                 #infant characteristics
+                 infant_sex_misc,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_growth_birth_weight_kg_imputed))
+
+demog_M6 <- demog %>% 
+        filter(timepoint=="M6")
+
+demog_M9 <- demog %>% 
+        filter(timepoint=="M9")
+
+demog_M12 <- demog %>% 
+        filter(timepoint=="M12")
+
+        ##### 3.2 M6 with M6 total selection #####
+M6_total_sel <- masterfile %>% filter (
+        timepoint == "M6") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg, #not enough power and skewing data
+                 infant_ffq_feeding_mode_simple,
+                 cluster_kday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_gm_score,
+                 infant_asq_fm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M6"), -next_id_infant) %>% 
+        na.omit()
+str(M6_total_sel)
+#377 15
+
+M6_total_sel <- M6_total_sel %>% 
+        mutate(M6_total_sel=1) %>%
+        select(c(next_id_infant,
+                 M6_total_sel))
+
+M6_total_sel <- left_join(M6_total_sel, demog_M6)
+#377 9
+
+#subset masterfile based on ids that are not in selection
+masterfile_M6 <- masterfile %>% 
+        filter(timepoint=="M6")
+#1023 204
+masterfile_M6$timepoint <- as.factor(as.character(masterfile_M6$timepoint))
+
+#filter out participants with NA values in all columns after 'timepoint'
+masterfile_M6_subset <- masterfile_M6 %>%
+        filter(!apply(select(., (which(names(.) == "timepoint") + 1):ncol(.)), 1, function(x) all(is.na(x))))
+#1017 204
+
+M6_total_not_sel <- masterfile_M6_subset %>%
+        filter(!(next_id_infant %in% M6_total_sel$next_id_infant))
+#640 204 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M6_total_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_total_sel$mother_birthcard_parity_catg))*100
+
+table(M6_total_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_total_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M6_total_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M6_total_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M6_total_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_total_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M6_total_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_total_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M6_total_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M6_total_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M6_total_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_total_sel$mother_education_p18))*100
+
+table(M6_total_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_total_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M6_total_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M6_total_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant characteristics
+        #infant_sex_misc
+table(M6_total_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_total_sel$infant_sex_misc))*100
+
+table(M6_total_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_total_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M6_total_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M6_total_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M6_total_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_total_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M6_total_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_total_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M6_total_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M6_total_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M6_total_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M6_total_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M6_total_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M6_total_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M6_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M6_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M6_total_sel$infant_growth_birth_weight_kg_imputed, M6_total_not_sel$infant_growth_birth_weight_kg_imputed)
+
+        ##### 3.3 M9 with M9 total selection #####
+#M9 dataframe
+M9_total_sel <- masterfile %>% filter (
+        timepoint == "M9") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+                 infant_ffq_feeding_mode_simple,
+                 cluster_kday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed)) %>%
+        #infant_asq_total_score, #ASQ not available at M9
+        #infant_asq_com_score,
+        #infant_asq_gm_score,
+        #infant_asq_fm_score,
+        #infant_asq_ps_score,
+        #infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M9"), -next_id_infant) %>%
+        na.omit()
+str(M9_total_sel)
+#426 9
+
+M9_total_sel <- M9_total_sel %>% 
+        mutate(M9_total_sel=1) %>%
+        select(c(next_id_infant,
+                 M9_total_sel))
+
+M9_total_sel <- left_join(M9_total_sel, demog_M9)
+#426 9
+
+#subset masterfile based on ids that are not in selection
+masterfile_M9 <- masterfile %>% 
+        filter(timepoint=="M9")
+#1023 204
+masterfile_M9$timepoint <- as.factor(as.character(masterfile_M9$timepoint))
+
+#filter out participants with NA values in all columns after 'timepoint'
+masterfile_M9_subset <- masterfile_M9 %>%
+        filter(!apply(select(., (which(names(.) == "timepoint") + 1):ncol(.)), 1, function(x) all(is.na(x))))
+#1017 204
+
+M9_total_not_sel <- masterfile_M9_subset %>%
+        filter(!(next_id_infant %in% M9_total_sel$next_id_infant))
+#591 204 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M9_total_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M9_total_sel$mother_birthcard_parity_catg))*100
+
+table(M9_total_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M9_total_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M9_total_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M9_total_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M9_total_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M9_total_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M9_total_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M9_total_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M9_total_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M9_total_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M9_total_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M9_total_sel$mother_education_p18))*100
+
+table(M9_total_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M9_total_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M9_total_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M9_total_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant characteristics
+#infant_sex_misc
+table(M9_total_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M9_total_sel$infant_sex_misc))*100
+
+table(M9_total_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M9_total_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M9_total_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M9_total_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M9_total_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M9_total_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M9_total_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M9_total_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M9_total_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M9_total_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M9_total_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M9_total_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M9_total_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M9_total_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M9_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M9_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M9_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M9_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M9_total_sel$infant_growth_birth_weight_kg_imputed, M9_total_not_sel$infant_growth_birth_weight_kg_imputed)
+
+                
+        ##### 3.4 M12 with M12 total selection #####
+M12_total_sel <- masterfile %>% filter (
+        timepoint == "M12") %>%
+        select(c(next_id_infant,
+                 mother_birthcardself_gestational_age_weeks_catg,
+                 infant_sex_misc,
+                 infant_growth_birth_weight_kg_imputed,
+                 #mother_lifelinesbirthcards_prepreg_bmi_kg_m2_catg,
+                 infant_ffq_feeding_mode_simple,
+                 cluster_kday,
+                 cluster_kday,
+                 infant_ffq_energy_kcalday_item_sum_recal,
+                 infant_growth_WLZ_imputed,
+                 infant_growth_BMIz_imputed,
+                 infant_asq_total_score,
+                 infant_asq_com_score,
+                 infant_asq_gm_score,
+                 infant_asq_fm_score,
+                 infant_asq_ps_score,
+                 infant_asq_psoc_score)) %>%
+        rename_with(~paste0(., "_M12"), -next_id_infant) %>%
+        na.omit()
+str(M12_total_sel)
+#358 15
+
+M12_total_sel <- M12_total_sel %>% 
+        mutate(M12_total_sel=1) %>%
+        select(c(next_id_infant,
+                 M12_total_sel))
+
+M12_total_sel <- left_join(M12_total_sel, demog_M12)
+#358 9
+
+#subset masterfile based on ids that are not in selection
+masterfile_M12 <- masterfile %>% 
+        filter(timepoint=="M12")
+#1023 204
+masterfile_M12$timepoint <- as.factor(as.character(masterfile_M12$timepoint))
+
+#filter out participants with NA values in all columns after 'timepoint'
+masterfile_M12_subset <- masterfile_M12 %>%
+        filter(!apply(select(., (which(names(.) == "timepoint") + 1):ncol(.)), 1, function(x) all(is.na(x))))
+#1017 204
+
+M12_total_not_sel <- masterfile_M12_subset %>%
+        filter(!(next_id_infant %in% M12_total_sel$next_id_infant))
+#659 204 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M12_total_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M12_total_sel$mother_birthcard_parity_catg))*100
+
+table(M12_total_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M12_total_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M12_total_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M12_total_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M12_total_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M12_total_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M12_total_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M12_total_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M12_total_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M12_total_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M12_total_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M12_total_sel$mother_education_p18))*100
+
+table(M12_total_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M12_total_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M12_total_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M12_total_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant characteristics
+#infant_sex_misc
+table(M12_total_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M12_total_sel$infant_sex_misc))*100
+
+table(M12_total_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M12_total_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M12_total_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M12_total_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M12_total_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M12_total_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M12_total_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M12_total_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M12_total_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M12_total_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+#infant_growth_birth_weight_kg
+hist(M12_total_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M12_total_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M12_total_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M12_total_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M12_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M12_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M12_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M12_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M12_total_sel$infant_growth_birth_weight_kg_imputed, M12_total_not_sel$infant_growth_birth_weight_kg_imputed)
+
+        ##### 3.5 M6 with M9 total selection #####
+#M6_M9 dataframe
+M6_total_sel <- M6_total_sel %>% 
+        select(c(next_id_infant,
+                 M6_total_sel))
+
+M9_total_sel <- M9_total_sel %>% 
+        select(c(next_id_infant,
+                 M9_total_sel))
+
+M6_M9_total_sel <- full_join(M6_total_sel, M9_total_sel) %>%
+        na.omit()
+str(M6_M9_total_sel)
+#318 3
+
+M6_M9_total_sel <- left_join(M6_M9_total_sel, demog_M6)
+#318 10
+
+M6_M9_total_not_sel <- masterfile_M6_subset %>%
+        filter(!(next_id_infant %in% M6_M9_total_sel$next_id_infant))
+#699 204 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M6_M9_total_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_M9_total_sel$mother_birthcard_parity_catg))*100
+
+table(M6_M9_total_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_M9_total_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M6_M9_total_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M6_M9_total_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M6_M9_total_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_M9_total_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M6_M9_total_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_M9_total_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M6_M9_total_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M6_M9_total_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M6_M9_total_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_M9_total_sel$mother_education_p18))*100
+
+table(M6_M9_total_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_M9_total_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M6_M9_total_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M6_M9_total_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+fisher.test(contingency_table)
+
+        #infant characteristics
+#infant_sex_misc
+table(M6_M9_total_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_M9_total_sel$infant_sex_misc))*100
+
+table(M6_M9_total_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_M9_total_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M6_M9_total_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M6_M9_total_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M6_M9_total_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_M9_total_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M6_M9_total_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_M9_total_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M6_M9_total_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M6_M9_total_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M6_M9_total_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M6_M9_total_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M6_M9_total_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M6_M9_total_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M6_M9_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_M9_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M6_M9_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_M9_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M6_M9_total_sel$infant_growth_birth_weight_kg_imputed, M6_M9_total_not_sel$infant_growth_birth_weight_kg_imputed)
+
+        ##### 3.6 M6 with M12 total selection #####
+#M6_M12 dataframe
+M6_total_sel <- M6_total_sel %>% 
+        select(c(next_id_infant,
+                 M6_total_sel))
+
+M12_total_sel <- M12_total_sel %>% 
+        select(c(next_id_infant,
+                 M12_total_sel))
+
+M6_M12_total_sel <- full_join(M6_total_sel, M12_total_sel) %>%
+        na.omit()
+str(M6_M12_total_sel)
+#267 3
+
+M6_M12_total_sel <- left_join(M6_M12_total_sel, demog_M6)
+#267 10
+
+M6_M12_total_not_sel <- masterfile_M6_subset %>%
+        filter(!(next_id_infant %in% M6_M12_total_sel$next_id_infant))
+#750 204 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M6_M12_total_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_M12_total_sel$mother_birthcard_parity_catg))*100
+
+table(M6_M12_total_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M6_M12_total_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M6_M12_total_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M6_M12_total_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M6_M12_total_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_M12_total_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M6_M12_total_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M6_M12_total_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M6_M12_total_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M6_M12_total_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+#mother_education_p18
+table(M6_M12_total_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_M12_total_sel$mother_education_p18))*100
+
+table(M6_M12_total_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M6_M12_total_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M6_M12_total_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M6_M12_total_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+fisher.test(contingency_table)
+
+        #infant characteristics
+#infant_sex_misc
+table(M6_M12_total_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_M12_total_sel$infant_sex_misc))*100
+
+table(M6_M12_total_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M6_M12_total_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M6_M12_total_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M6_M12_total_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+#mother_birthcardself_gestational_age_weeks_catg
+table(M6_M12_total_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_M12_total_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M6_M12_total_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M6_M12_total_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M6_M12_total_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M6_M12_total_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+#infant_growth_birth_weight_kg
+hist(M6_M12_total_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M6_M12_total_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M6_M12_total_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M6_M12_total_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M6_M12_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_M12_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M6_M12_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M6_M12_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M6_M12_total_sel$infant_growth_birth_weight_kg_imputed, M6_M12_total_not_sel$infant_growth_birth_weight_kg_imputed)
+
+        ##### 3.7 M9 with M12 total selection #####
+#M9_M12 dataframe
+M9_total_sel <- M9_total_sel %>% 
+        select(c(next_id_infant,
+                 M9_total_sel))
+
+M12_total_sel <- M12_total_sel %>% 
+        select(c(next_id_infant,
+                 M12_total_sel))
+
+M9_M12_total_sel <- full_join(M9_total_sel, M12_total_sel) %>%
+        na.omit()
+str(M9_M12_total_sel)
+#287 3
+
+M9_M12_total_sel <- left_join(M9_M12_total_sel, demog_M9)
+#287 10
+
+M9_M12_total_not_sel <- masterfile_M6_subset %>%
+        filter(!(next_id_infant %in% M9_M12_total_sel$next_id_infant))
+#730 204 
+
+        #maternal characteristics
+#mother_birthcard_parity_catg
+table(M9_M12_total_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M9_M12_total_sel$mother_birthcard_parity_catg))*100
+
+table(M9_M12_total_not_sel$mother_birthcard_parity_catg, useNA = "ifany")
+prop.table(table(M9_M12_total_not_sel$mother_birthcard_parity_catg))*100
+
+sel_parity_counts <- M9_M12_total_sel %>%
+        count(mother_birthcard_parity_catg)%>%
+        na.omit()
+
+unsel_parity_counts <- M9_M12_total_not_sel %>%
+        count(mother_birthcard_parity_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        parity = c("primiparous", "multiparous"),
+        sel_counts = sel_parity_counts$n,
+        unsel_count = unsel_parity_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "parity") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #birth_deliverybirthcard_mode_binary
+table(M9_M12_total_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M9_M12_total_sel$birth_deliverybirthcard_mode_binary))*100
+
+table(M9_M12_total_not_sel$birth_deliverybirthcard_mode_binary, useNA = "ifany")
+prop.table(table(M9_M12_total_not_sel$birth_deliverybirthcard_mode_binary))*100
+
+sel_del_counts <- M9_M12_total_sel %>%
+        count(birth_deliverybirthcard_mode_binary)%>%
+        na.omit()
+
+unsel_del_counts <- M9_M12_total_not_sel %>%
+        count(birth_deliverybirthcard_mode_binary) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        del = c("CS", "VG"),
+        sel_counts = sel_del_counts$n,
+        unsel_count = unsel_del_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "del") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_education_p18
+table(M9_M12_total_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M9_M12_total_sel$mother_education_p18))*100
+
+table(M9_M12_total_not_sel$mother_education_p18, useNA = "ifany")
+prop.table(table(M9_M12_total_not_sel$mother_education_p18))*100
+
+sel_edu_counts <- M9_M12_total_sel %>%
+        count(mother_education_p18)%>%
+        na.omit()
+
+unsel_edu_counts <- M9_M12_total_not_sel %>%
+        count(mother_education_p18) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        edu = c("0_elementary_to_lower_secondary_education", "1_upper_secondary_education", "2_tertiary_education"),
+        sel_counts = sel_edu_counts$n,
+        unsel_count = unsel_edu_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "edu") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+fisher.test(contingency_table)
+
+        #infant characteristics
+#infant_sex_misc
+table(M9_M12_total_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M9_M12_total_sel$infant_sex_misc))*100
+
+table(M9_M12_total_not_sel$infant_sex_misc, useNA = "ifany")
+prop.table(table(M9_M12_total_not_sel$infant_sex_misc))*100
+
+sel_sex_counts <- M9_M12_total_sel %>%
+        count(infant_sex_misc)%>%
+        na.omit()
+
+unsel_sex_counts <- M9_M12_total_not_sel %>%
+        count(infant_sex_misc) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        sex = c("female", "male"),
+        sel_counts = sel_sex_counts$n,
+        unsel_count = unsel_sex_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "sex") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #mother_birthcardself_gestational_age_weeks_catg
+table(M9_M12_total_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M9_M12_total_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+table(M9_M12_total_not_sel$mother_birthcardself_gestational_age_weeks_catg, useNA = "ifany")
+prop.table(table(M9_M12_total_not_sel$mother_birthcardself_gestational_age_weeks_catg))*100
+
+sel_ges_counts <- M9_M12_total_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg)%>%
+        na.omit()
+
+unsel_ges_counts <- M9_M12_total_not_sel %>%
+        count(mother_birthcardself_gestational_age_weeks_catg) %>%
+        na.omit()
+
+contingency_table <- tibble(
+        ges = c("pre_term", "term"),
+        sel_counts = sel_ges_counts$n,
+        unsel_count = unsel_ges_counts$n
+) %>%
+        replace_na(list(sel_counts = 0, unsel_count = 0)) %>% #if there is NA for one of the categories in the contingency table, make it 0
+        column_to_rownames(var = "ges") %>%
+        as.matrix()
+
+chisq.test(contingency_table)
+
+        #infant_growth_birth_weight_kg
+hist(M9_M12_total_sel$infant_growth_birth_weight_kg_imputed) #normal
+hist(M9_M12_total_not_sel$infant_growth_birth_weight_kg_imputed) #normal
+dev.off()
+
+table(M9_M12_total_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+table(M9_M12_total_not_sel$infant_growth_birth_weight_kg_imputed, useNA="ifany")
+
+mean(M9_M12_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M9_M12_total_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+mean(M9_M12_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+sd(M9_M12_total_not_sel$infant_growth_birth_weight_kg_imputed, na.rm=T)
+
+# Perform t-test
+t.test(M9_M12_total_sel$infant_growth_birth_weight_kg_imputed, M9_M12_total_not_sel$infant_growth_birth_weight_kg_imputed)
+rm(list=ls())
