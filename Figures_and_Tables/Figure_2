@@ -1,0 +1,120 @@
+###     SCRIPT: FIGURE 2
+###     AUTHOR(S): SIOBHAN BRUSHETT
+###     DESCRIPTION: GENERATION OF FIGURES 2A-2B
+###     PROJECT: LL-NEXT: PHR
+###     LAST UPDATED: 18 OCTOBER 2025
+###     NOTE(S): 
+
+#libraries
+library(tidyverse)
+library(ggplot2)
+
+
+## Contents of this file
+
+## 0. LOAD FILE
+## 1. FIGURE 2: MEAN REL. WEIGHT (%G/DAY) AND ENERGY (%KCAL/DAY) INTAKE OF 4 CLASS DIETARY PATTERN
+
+        ##### =========================== 0. LOAD FILE =========================== #####
+#4 class dietary pattern: %g/day
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/manuscript/Re_ Manuscript Submission_ JAMA Pediatrics/")
+gday_4C <- read.delim("gday_4C.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+str(gday_4C)
+#168  3
+
+#4 class dietary pattern: %kcal/day
+kday_4C <- read.delim("kday_4C.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+str(kday_4C)
+#143  3
+
+        ##### =========================== FIGURE 2: MEAN REL. WEIGHT (%G/DAY) AND ENERGY (%KCAL/DAY) INTAKE OF 4 CLASS DIETARY PATTERN =========================== #####
+
+food_levels <- c("meat_sub", "dairy", "sugar_sweets", "snacks", "fish", "nuts", 
+                 "fats_and_oils", "meat", "eggs", "sweet_drinks", "legumes", 
+                 "pasta", "pancake", "tea", "grains", "breads", 
+                 "pastry", "water", "potatoes", "vegetables", "fruits")
+
+gday_4C$FoodGroup <- factor(gday_4C$FoodGroup, levels = food_levels)
+gday_4C$Pattern_Time <- factor(gday_4C$Pattern_Time, levels=c("pattern1_M6", "pattern2_M6", "pattern3_M6", "pattern4_M6",
+                                                           "pattern1_M9", "pattern2_M9", "pattern3_M9", "pattern4_M9",
+                                                           "pattern1_M12", "pattern2_M12", "pattern3_M12", "pattern4_M12"))
+str(gday_4C)
+
+kday_4C$FoodGroup <- factor(kday_4C$FoodGroup, levels = food_levels)
+
+kday_4C$Pattern_Time <- factor(kday_4C$Pattern_Time, levels=c("pattern1_M6", "pattern2_M6", "pattern3_M6", "pattern4_M6",
+                                                           "pattern1_M9", "pattern2_M9", "pattern3_M9", "pattern4_M9",
+                                                           "pattern1_M12", "pattern2_M12", "pattern3_M12", "pattern4_M12"))
+str(kday_4C)
+
+custom_palette <- c(
+        "#1F77B4", "#FF7F0E", "#D62728", "#9467BD", "#8C564B",
+        "#E377C2", "#7F7F7F", "#000000", "#17BECF", "#AEC7E8",
+        "#FA8072", "#FF9896", "#C5B0D5", "#C49C94", "#F7B6D2",
+        "#C7C7C7", "#008080", "#FFD92F", "#FFBB78", "#94618E",
+        "#66C2A5"
+)
+
+named_palette <- setNames(custom_palette, food_levels)
+
+gday_plot <- ggplot(gday_4C, aes(x = Pattern_Time, y = Mean_g_day, fill = FoodGroup)) +
+        geom_col(width = 0.7) +
+        geom_text(
+                aes(label = sprintf("%.1f", Mean_g_day)),  # always one decimal
+                position = position_stack(vjust = 0.5),
+                size = 2.8,
+                color = "black",
+                na.rm = TRUE
+        ) +
+        scale_fill_manual(values = named_palette) +  # use named palette
+        labs(
+                x = "Dietary Pattern and Timepoint",
+                y = "Mean %g/day",
+                fill = "Food Group",
+                title = ""
+        ) +
+        theme_minimal(base_size = 13) +
+        theme(
+                axis.text.x = element_text(angle = 45, hjust = 1),
+                legend.position = "right",
+                legend.title = element_text(face = "bold"),
+                legend.text = element_text(size = 10),
+                plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+                axis.title.x = element_text(face = "bold"),
+                axis.title.y = element_text(face = "bold")
+        )
+
+kday_plot <- ggplot(kday_4C, aes(x = Pattern_Time, y = Mean_k_day, fill = FoodGroup)) +
+        geom_col(width = 0.7) +
+        geom_text(
+                aes(label = sprintf("%.1f", Mean_k_day)),  # always one decimal
+                position = position_stack(vjust = 0.5),
+                size = 2.8,
+                color = "black",
+                na.rm = TRUE
+        ) +
+        scale_fill_manual(values = named_palette) +  # use named palette
+        labs(
+                x = "Dietary Pattern and Timepoint",
+                y = "Mean %kcal/day",
+                fill = "Food Group",
+                title = ""
+        ) +
+        theme_minimal(base_size = 13) +
+        theme(
+                axis.text.x = element_text(angle = 45, hjust = 1),
+                legend.position = "right",
+                legend.title = element_text(face = "bold"),
+                legend.text = element_text(size = 10),
+                plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+                axis.title.x = element_text(face = "bold"),
+                axis.title.y = element_text(face = "bold")
+        )
+
+pdf(file = "Figure2_dietary_classes_4C.pdf", width = 16, height = 12, useDingbats = F, onefile = T)
+Fig2 <- gday_plot + kday_plot +
+        plot_layout(nrow=2) +
+        plot_annotation(tag_levels = 'A')
+
+print(Fig2)
+dev.off()
