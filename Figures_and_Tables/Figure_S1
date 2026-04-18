@@ -1,0 +1,133 @@
+###     SCRIPT: UPSET PLOTS OF LONGITUDINAL DATA
+###     AUTHOR(S): SIOBHAN BRUSHETT
+###     DESCRIPTION: OVERVIEW OF INTERSECTION BETWEEN LONGITUDINAL GROWTH, DEVELOPMENT AND NUTRITION DATA
+###     PROJECT: LL-NEXT: PHR
+###     LAST UPDATED: 26 FEBRUARY 2024
+###     NOTE(S):
+
+library(tidyverse)
+library(UpSetR)
+library(patchwork)
+
+## Contents of this file
+
+## 0. LOAD FILE
+## 1. GENERATE DATA SETS
+## 2. PLOT UPSET PLOT
+
+        ##### =========================== 0. LOAD FILE =========================== #####
+#masterfile
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/")
+masterfile <- read.delim("masterfiles_merged_phr.txt", sep = "\t", header = TRUE, stringsAsFactors = T)
+#10230 196
+
+        ##### =========================== 1. GENERATE DATA SETS =========================== #####
+        
+        ##### 1.1 NUTRITION #####
+                ##### 1.1.1 M6 #####
+infant_ffq_M6 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M6") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday")) 
+#564  22
+
+        #criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M6 <- infant_ffq_M6 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#558 22
+
+nutrition_M6 <- infant_ffq_M6 %>%
+        mutate(nutrition_M6 = 1) %>%
+        select(c(
+                next_id_infant,
+                nutrition_M6))
+head(nutrition_M6)
+rm(infant_ffq_M6)
+
+                ##### 1.1.2 M9 #####
+infant_ffq_M9 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M9") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday"))
+#586 25
+
+        #criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M9 <- infant_ffq_M9 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#586 25
+
+nutrition_M9 <- infant_ffq_M9 %>%
+        mutate(nutrition_M9 = 1) %>%
+        select(c(
+                next_id_infant,
+                nutrition_M9))
+head(nutrition_M9)
+rm(infant_ffq_M9)
+
+                ##### 1.1.3 M12 #####
+infant_ffq_M12 <- masterfile %>% 
+        select(c(
+                next_id_infant,
+                timepoint,
+                infant_ffq_feeding_mode_simple,
+                infant_ffq_gday_item_sum_recal,
+                starts_with("infant_ffq_group"))) %>%
+        filter(timepoint == "M12") %>%
+        select(-where(~all(is.na(.)))) %>%  #remove columns where all values are missing
+        filter(!rowSums(is.na(select(., -c(next_id_infant, timepoint, infant_ffq_feeding_mode_simple)))) == (ncol(.) - 3)) %>% #remove participants with all NAs after infant_ffq_feeding_mode_simple
+        rename_with(~str_remove(., "infant_ffq_group_"), starts_with("infant_ffq_group")) %>%
+        rename_with(~str_remove(., "_gday"), ends_with("gday"))
+#478 25
+
+#criteria 1: filter for infants consuming >0 g./day
+infant_ffq_M12 <- infant_ffq_M12 %>% 
+        filter(infant_ffq_gday_item_sum_recal>0)
+#478 25
+
+nutrition_M12 <- infant_ffq_M12 %>%
+        mutate(nutrition_M12 = 1) %>%
+        select(c(
+                next_id_infant,
+                nutrition_M12))
+head(nutrition_M12)
+rm(infant_ffq_M12)
+
+
+        ##### 1.2 COMBINED DF #####
+
+#nutrition only
+df_nutrition <- list(nutrition_M6, nutrition_M9, nutrition_M12)
+
+df_nutrition <- df_nutrition %>% reduce(full_join)
+#741  4
+summary(df_nutrition)
+df_nutrition <- df_nutrition %>%
+        mutate_at(vars(-next_id_infant), ~replace(., is.na(.), 0))
+
+        ##### =========================== 2. PLOT UPSET PLOT =========================== #####
+setwd("C:/Users/Siobhan Brushett/OneDrive - UMCG/NEXT_clean_up/phr_data_freeze_2023_08_25/phr_project_masterfiles/manuscript_supp_figures/")
+pdf(file = "phr_UpSet_plot_long_nutrition.pdf", width = 20, height = 12, useDingbats = F, onefile = T)
+
+UpSetR::upset(df_nutrition, nsets=8, text.scale=1, order.by="freq",
+              main.bar.color = "#BDD9C5", 
+              sets.bar.color = "#EACCCA",
+              matrix.color = "black", ) 
+dev.off()
+rm(list=ls())
+
